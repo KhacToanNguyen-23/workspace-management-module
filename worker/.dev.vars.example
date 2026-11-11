@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local secrets (never commit .dev.vars).
+# Service account JSON (one line) with domain-wide delegation for
+# https://www.googleapis.com/auth/admin.directory.user.readonly
+# GOOGLE_SA_KEY={"client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----\n..."}
+# Mock directory for DIRECTORY_MODE=mock (empty = every @hyperdatalab.org address is active):
+# DIRECTORY_MOCK=[{"email":"alice@hyperdatalab.org","name":"Alice","suspended":false}]
+# API_CONTACT_EMAIL=

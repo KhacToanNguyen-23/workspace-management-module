@@ -1,0 +1,125 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useMe } from "../App";
+import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../components/ui";
+import { useApi, useQuery } from "../lib/api";
+import { ROLE_LABEL, type WorkspaceSummary } from "../lib/types";
+
+/** Pick a workspace and send a join request; a manager of that workspace must approve it. */
+export function OnboardingPage() {
+  const api = useApi();
+  const { me, reload: reloadMe } = useMe();
+  const list = useQuery<WorkspaceSummary[]>("/workspaces");
+  const act = useAction();
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const approved = me.memberships.some((m) => m.status === "approved");
+
+  const refresh = () => {
+    list.reload();
+    reloadMe();
+  };
+
+  return (
+    <div>
+      <PageHeader
+        title="Tham gia workspace"
+        sub={
+          approved
+            ? "Bạn có thể xin vào thêm workspace khác."
+            : "Bạn chưa thuộc workspace nào. Chọn một workspace và gửi yêu cầu; manager của workspace đó sẽ duyệt."
+        }
+      />
+      {me.memberships.length > 0 && (
+        <section className="card">
+          <h3>Yêu cầu của tôi</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Workspace</th>
+                <th>Vai trò</th>
+                <th>Trạng thái</th>
+                <th>Gửi lúc</th>
+                <th>Ghi chú duyệt</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {me.memberships.map((m) => (
+                <tr key={m.id}>
+                  <td>
+                    {m.status === "approved" ? <Link to={`/w/${m.workspace.id}/corpora`}>{m.workspace.name}</Link> : m.workspace.name}
+                  </td>
+                  <td>{ROLE_LABEL[m.role]}</td>
+                  <td>
+                    <Badge value={m.status} />
+                  </td>
+                  <td>{fmtDate(m.requestedAt)}</td>
+                  <td className="muted">{m.decisionNote || "—"}</td>
+                  <td>
+                    {m.status === "pending" && (
+                      <button
+                        className="link"
+                        disabled={act.busy}
+                        onClick={() => act.run(() => api("DELETE", `/workspaces/${m.workspace.id}/join`)).then(refresh)}
+                      >
+                        Rút yêu cầu
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      <ErrorBox error={act.error ?? list.error} />
+      {!list.data ? (
+        <Loading />
+      ) : list.data.length === 0 ? (
+        <p className="muted">Chưa có workspace nào. Liên hệ admin để tạo.</p>
+      ) : (
+        <div className="grid">
+          {list.data.map((w) => {
+            const canRequest = !w.myStatus || w.myStatus === "rejected" || w.myStatus === "revoked";
+            return (
+              <article key={w.id} className="card">
+                <div className="row between">
+                  <h3>{w.name}</h3>
+                  <span className="tag">{w.type}</span>
+                </div>
+                <p className="muted">{w.description || "Không có mô tả."}</p>
+                <p className="small muted">
+                  {w.memberCount} thành viên · Quản lý: {w.managers.join(", ") || "chưa có"}
+                </p>
+                {w.myStatus && (
+                  <p>
+                    <Badge value={w.myStatus} />
+                  </p>
+                )}
+                {canRequest && (
+                  <div className="stack">
+                    <input
+                      placeholder="Lời nhắn cho manager (tuỳ chọn)"
+                      value={notes[w.id] ?? ""}
+                      onChange={(e) => setNotes({ ...notes, [w.id]: e.target.value })}
+                    />
+                    <button
+                      className="primary"
+                      disabled={act.busy}
+                      onClick={() =>
+                        act.run(() => api("POST", `/workspaces/${w.id}/join`, { note: notes[w.id] ?? "" })).then(refresh)
+                      }
+                    >
+                      Gửi yêu cầu tham gia
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
