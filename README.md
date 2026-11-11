@@ -65,16 +65,20 @@ npm run build
 
 ```text
 backend/src/main/java/org/hyperdatalab/wbmodule/
-  auth/        Xác thực Firebase/dev token và filter
-  config/      Cấu hình Firestore
-  directory/   Adapter user directory (HTTP, Google, mock)
-  identity/    IdentityService và audit log
-  store/       Truy cập collection Firestore và seeder
-  workspace/   API role, workspace, membership và request
+  auth/             Xác thực và filter
+  admin/            API quản trị
+  common/           Lỗi, role và cấu hình ứng dụng
+  config/           Cấu hình Firestore
+  directory/        Adapter user directory
+  identity/         Danh tính, audit và API hồ sơ
+  store/            Truy cập Firestore
+  workspace/        Workspace, quyền và membership
+    request/        Yêu cầu tạo workspace
+    download/       Yêu cầu download
 web/src/
-  app/         Router, layout và context
-  features/    Màn hình auth, admin và workspace
-  shared/      Component, API client và kiểu dùng chung
+  app/              Router, layout và context
+  features/         Màn hình auth, admin và workspace
+  shared/           Component, API client và kiểu dùng chung
 ```
 
 ## Cấu hình chính
