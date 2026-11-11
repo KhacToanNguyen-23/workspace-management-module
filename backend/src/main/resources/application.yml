@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: wb-module
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/wb_module}
+    username: ${DB_USER:wb}
+    password: ${DB_PASSWORD:wb_local_only}
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: always
+  servlet:
+    multipart:
+      enabled: false
+
+app:
+  org-domain: hyperdatalab.org
+  admin-email: admin@hyperdatalab.org
+  auth:
+    # firebase (production) | dev (local only: Bearer dev:<email>)
+    mode: ${AUTH_MODE:dev}
+    firebase-project-id: hyperdatalab-writing-bank
+  directory:
+    # http (external user API) | google (Admin SDK) | mock | off
+    mode: ${DIRECTORY_MODE:mock}
+    http-base-url: ${DIRECTORY_HTTP_BASE_URL:}
+    http-token: ${DIRECTORY_HTTP_TOKEN:}
+    google-service-account-file: ${GOOGLE_SA_FILE:}
+    cache-hours: 12
+  cors-origins:
+    - ${CORS_ORIGIN:http://localhost:5174}

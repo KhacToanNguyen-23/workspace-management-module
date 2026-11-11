@@ -1,0 +1,15 @@
+app:
+  auth:
+    mode: dev
+  directory:
+    mode: mock
+    mock-users:
+      - { email: admin@hyperdatalab.org, name: Lab Admin, department: /, suspended: false }
+      - { email: manager@hyperdatalab.org, name: Manager Mai, department: /research, suspended: false }
+      - { email: alice@hyperdatalab.org, name: Alice Nguyen, department: /research, suspended: false }
+      - { email: bob@hyperdatalab.org, name: Bob Tran, department: /review, suspended: false }
+      - { email: gone@hyperdatalab.org, name: Former, suspended: true }
+
+spring:
+  datasource:
+    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5433/wb_module_test}
