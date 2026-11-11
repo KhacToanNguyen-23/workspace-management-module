@@ -10,9 +10,12 @@ export function LoginPage() {
   return (
     <div className="center-page">
       <div className="card narrow">
-        <h1>Writing Bank</h1>
+        <span className="tag login-pill">HyperData Lab</span>
+        <h1>
+          Writing <span>Bank</span>
+        </h1>
         <p className="muted">
-          Đăng nhập bằng tài khoản Google <b>@{ORG_DOMAIN}</b>. Tài khoản được đối chiếu với danh bạ Google Workspace của lab.
+          Đăng nhập bằng tài khoản Google <b>@{ORG_DOMAIN}</b>. Tài khoản được đối chiếu với danh sách member của lab.
           Sau khi vào, chọn workspace và chờ manager duyệt.
         </p>
         {AUTH_MODE === "firebase" ? (

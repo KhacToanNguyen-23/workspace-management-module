@@ -58,7 +58,13 @@ function Shell() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">Writing Bank · Module</div>
+        <div className="brand">
+          <span className="brand-mark">W</span>
+          <span>
+            Writing Bank
+            <small>HyperData Lab</small>
+          </span>
+        </div>
         <label className="field">
           <span>Workspace</span>
           <select
@@ -78,7 +84,7 @@ function Shell() {
         <NavLink to="/onboarding">Tham gia workspace</NavLink>
         {me.user.isAdmin && <NavLink to="/admin">Quản trị</NavLink>}
         <div className="sidebar-foot">
-          <div className="muted small">{me.user.name || me.user.email}</div>
+          <div className="who small">{me.user.name || me.user.email}</div>
           <div className="muted small">{me.user.email}</div>
           <button className="link" onClick={() => void signOut()}>
             Đăng xuất
