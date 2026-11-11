@@ -1,7 +1,47 @@
-export type Permission = "workspace.read" | "workspace.write" | "workspace.review" | "members.manage";
-
-export type WorkspaceRole = "viewer" | "member" | "manager";
+export type GlobalRole = "admin" | "workspace_manager" | "member";
+export type WorkspaceRole = "manager" | "member";
 export type MembershipStatus = "pending" | "approved" | "rejected" | "revoked";
+
+export interface WorkspaceRequest {
+  id: string;
+  requester?: string;
+  requesterName?: string;
+  department?: string | null;
+  role?: GlobalRole;
+  name: string;
+  slug: string;
+  type: string;
+  description: string;
+  reason: string;
+  status: string;
+  requestedAt: string;
+  decisionNote: string;
+  workspaceId?: string;
+}
+export interface DownloadRequest {
+  id: string;
+  workspaceId: string;
+  requester: string;
+  requesterName: string;
+  paperRef: string;
+  note: string;
+  status: string;
+  requestedAt: string;
+  decisionNote: string;
+}
+export interface AdminUser {
+  email: string;
+  name: string;
+  department: string | null;
+  directoryStatus: string;
+  role: GlobalRole;
+  disabled: boolean;
+  disabledAt: string | null;
+  disabledBy: string | null;
+  lastSeen: string | null;
+  syncedAt: string | null;
+  workspaces: { name: string; role: string; status: string }[];
+}
 
 export interface Me {
   user: {
@@ -10,20 +50,28 @@ export interface Me {
     photoUrl: string | null;
     department: string | null;
     isAdmin: boolean;
+    role: GlobalRole;
+    disabled: boolean;
     directoryStatus: string;
   };
   memberships: {
     id: string;
-    workspace: { id: string; name: string; slug: string; type: string; status: string };
+    workspace: {
+      id: string;
+      name: string;
+      slug: string;
+      type: string;
+      status: string;
+    };
     role: WorkspaceRole;
     status: MembershipStatus;
     requestedAt: string;
     decidedAt: string | null;
     decisionNote: string;
-    permissions: Permission[];
+    canManage: boolean;
   }[];
+  workspaceRequest: WorkspaceRequest | null;
 }
-
 export interface WorkspaceSummary {
   id: string;
   slug: string;
@@ -35,15 +83,18 @@ export interface WorkspaceSummary {
   myStatus: MembershipStatus | null;
   myRole: WorkspaceRole | null;
 }
-
 export interface WorkspaceInfo {
-  workspace: { id: string; name: string; slug: string; type: string; description: string; status: string };
+  workspace: {
+    id: string;
+    name: string;
+    slug: string;
+    type: string;
+    description: string;
+    status: string;
+  };
   role: WorkspaceRole | null;
-  enabledPermissions: Permission[];
-  permissions: Permission[];
-  toggleablePermissions: Permission[];
+  canManage: boolean;
 }
-
 export interface MemberRow {
   id: string;
   email: string;
@@ -58,9 +109,8 @@ export interface MemberRow {
   decidedAt: string | null;
   decisionNote: string;
 }
-
 export interface AuditRow {
-  id: number;
+  id: string;
   at: string;
   actor: string;
   action: string;
@@ -68,7 +118,6 @@ export interface AuditRow {
   workspaceId: string | null;
   detail: Record<string, unknown>;
 }
-
 export interface Person {
   email: string;
   name: string;
@@ -76,21 +125,21 @@ export interface Person {
   photoUrl: string | null;
   role: WorkspaceRole;
 }
-
-export const PERMISSION_LABEL: Record<Permission, string> = {
-  "workspace.read": "Xem nội dung",
-  "workspace.write": "Tạo / sửa nội dung",
-  "workspace.review": "Duyệt nội dung",
-  "members.manage": "Quản lý thành viên",
+export const GLOBAL_ROLE_LABEL: Record<GlobalRole, string> = {
+  admin: "Quản trị viên",
+  workspace_manager: "Quản lý workspace",
+  member: "Thành viên",
 };
-
-export const ROLE_LABEL: Record<WorkspaceRole, string> = { viewer: "Người xem", member: "Thành viên", manager: "Quản lý" };
-
+export const ROLE_LABEL: Record<WorkspaceRole, string> = {
+  member: "Thành viên",
+  manager: "Quản lý",
+};
 export const STATUS_LABEL: Record<string, string> = {
   pending: "Chờ duyệt",
   approved: "Đã duyệt",
   rejected: "Từ chối",
   revoked: "Đã thu hồi",
+  withdrawn: "Đã rút",
   active: "Đang hoạt động",
   suspended: "Bị đình chỉ",
   missing: "Không có trong danh bạ",

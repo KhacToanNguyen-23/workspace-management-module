@@ -1,14 +1,25 @@
 import type { ReactNode } from "react";
-import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  Navigate,
+  NavLink,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { AdminPage } from "../features/admin/Admin";
 import { LoginPage } from "../features/auth/Login";
 import { useAuth } from "../features/auth/auth";
 import { MembersPage } from "../features/workspaces/Members";
 import { OnboardingPage } from "../features/workspaces/Onboarding";
 import { WorkspaceHomePage } from "../features/workspaces/WorkspaceHome";
+import { CreateWorkspacePage } from "../features/workspaces/CreateWorkspace";
 import { ErrorBox, Loading } from "../shared/components/ui";
 import { useQuery } from "../shared/lib/api";
 import type { Me, WorkspaceInfo } from "../shared/lib/types";
+import { GLOBAL_ROLE_LABEL } from "../shared/lib/types";
 import { MeContext, WorkspaceContext, useMe } from "./contexts";
 
 function RequireSession({ children }: { children: ReactNode }) {
@@ -17,7 +28,14 @@ function RequireSession({ children }: { children: ReactNode }) {
   const q = useQuery<Me>(session ? "/me" : null);
   if (!ready) return <Loading />;
   // Remember where the user was going so SSO brings them back to the same page.
-  if (!session) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  if (!session)
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname + location.search }}
+      />
+    );
   if (q.error) {
     return (
       <div className="center-page">
@@ -30,15 +48,23 @@ function RequireSession({ children }: { children: ReactNode }) {
     );
   }
   if (!q.data) return <Loading />;
-  return <MeContext.Provider value={{ value: q.data, reload: q.reload }}>{children}</MeContext.Provider>;
+  return (
+    <MeContext.Provider value={{ value: q.data, reload: q.reload }}>
+      {children}
+    </MeContext.Provider>
+  );
 }
 
 /** Members must belong to an approved workspace; otherwise they land on onboarding. */
 function Home() {
   const { me } = useMe();
-  const first = me.memberships.find((m) => m.status === "approved" && m.workspace.status === "active");
+  const first = me.memberships.find(
+    (m) => m.status === "approved" && m.workspace.status === "active",
+  );
   if (first) return <Navigate to={`/w/${first.workspace.id}`} replace />;
   if (me.user.isAdmin) return <Navigate to="/admin" replace />;
+  if (me.user.role === "workspace_manager")
+    return <Navigate to="/create-workspace" replace />;
   return <Navigate to="/onboarding" replace />;
 }
 
@@ -76,11 +102,19 @@ function Shell() {
         </label>
         {wid && <WorkspaceNav wid={wid} />}
         <div className="nav-group">Chung</div>
-        <NavLink to="/onboarding">Tham gia workspace</NavLink>
+        <NavLink to="/onboarding">
+          {me.user.role === "member"
+            ? "Tham gia / xin tạo workspace"
+            : "Tham gia workspace"}
+        </NavLink>
+        {me.user.role === "workspace_manager" && (
+          <NavLink to="/create-workspace">Tạo workspace</NavLink>
+        )}
         {me.user.isAdmin && <NavLink to="/admin">Quản trị</NavLink>}
         <div className="sidebar-foot">
           <div className="who small">{me.user.name || me.user.email}</div>
           <div className="muted small">{me.user.email}</div>
+          <div className="tag">{GLOBAL_ROLE_LABEL[me.user.role]}</div>
           <button className="link" onClick={() => void signOut()}>
             Đăng xuất
           </button>
@@ -96,12 +130,17 @@ function Shell() {
 function WorkspaceNav({ wid }: { wid: string }) {
   const { me } = useMe();
   const m = me.memberships.find((x) => x.workspace.id === wid);
-  const canManage = me.user.isAdmin || m?.permissions.includes("members.manage");
+  const canManage = me.user.isAdmin || m?.canManage;
   return (
     <>
       <div className="nav-group">Workspace</div>
-      <NavLink to={`/w/${wid}`} end>Tổng quan</NavLink>
-      {canManage && <NavLink to={`/w/${wid}/members`}>Thành viên & quyền</NavLink>}
+      <NavLink to={`/w/${wid}`} end>
+        Tổng quan
+      </NavLink>
+      <NavLink to={`/w/${wid}#downloads`}>Yêu cầu download</NavLink>
+      {canManage && (
+        <NavLink to={`/w/${wid}/members`}>Quản lý workspace</NavLink>
+      )}
     </>
   );
 }
@@ -131,6 +170,7 @@ export function App() {
       >
         <Route index element={<Home />} />
         <Route path="onboarding" element={<OnboardingPage />} />
+        <Route path="create-workspace" element={<CreateWorkspacePage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route path="w/:wid" element={<WorkspaceRoute />}>
           <Route index element={<WorkspaceHomePage />} />

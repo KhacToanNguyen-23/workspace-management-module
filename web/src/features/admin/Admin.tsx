@@ -1,94 +1,100 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useMe } from "../../app/contexts";
-import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../../shared/components/ui";
 import { AuditTable } from "../../shared/components/AuditTable";
+import {
+  Badge,
+  ErrorBox,
+  Loading,
+  PageHeader,
+  useAction,
+} from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
-import type { AuditRow } from "../../shared/lib/types";
+import type {
+  AdminUser,
+  AuditRow,
+  WorkspaceRequest,
+} from "../../shared/lib/types";
 
-interface AdminUser {
-  email: string;
-  name: string;
-  department: string | null;
-  directoryStatus: string;
-  globalRole: "user" | "admin";
-  disabled: boolean;
-  lastSeen: string | null;
-  syncedAt: string | null;
-  workspaces: { name: string; role: string; status: string }[];
-}
-
-interface AdminWorkspace {
-  id: string;
-  slug: string;
-  name: string;
-  type: string;
-  description: string;
-  status: "active" | "archived";
-  memberCount: number;
-  pendingCount: number;
-  managers: string[];
-  permissions: string[];
-}
-
-interface WsType {
-  code: string;
-  name: string;
-  description: string;
-  defaultPermissions: string[];
-}
-
-/** Global admin (admin@hyperdatalab.org): directory users, workspaces, managers, audit. */
+type Tab = "users" | "requests" | "workspaces" | "audit";
 export function AdminPage() {
   const { me } = useMe();
-  const [tab, setTab] = useState<"users" | "workspaces" | "audit">("workspaces");
-  if (!me.user.isAdmin) return <ErrorBox error="Chỉ admin mới vào được trang này." />;
+  const [tab, setTab] = useState<Tab>("users");
+  if (!me.user.isAdmin)
+    return <ErrorBox error="Chỉ admin mới vào được trang này." />;
   return (
     <div>
-      <PageHeader title="Quản trị" sub="Member @hyperdatalab.org, workspace, quyền và nhật ký." />
+      <PageHeader
+        title="Quản trị"
+        sub="Người dùng, yêu cầu tạo workspace, workspace và nhật ký."
+      />
       <div className="tabs">
-        {(["workspaces", "users", "audit"] as const).map((t) => (
-          <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-            {t === "workspaces" ? "Workspace" : t === "users" ? "Người dùng" : "Nhật ký"}
+        {(["users", "requests", "workspaces", "audit"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            className={tab === t ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
+            {
+              {
+                users: "Người dùng",
+                requests: "Yêu cầu tạo workspace",
+                workspaces: "Workspace",
+                audit: "Nhật ký",
+              }[t]
+            }
           </button>
         ))}
       </div>
-      {tab === "users" && <UsersTab />}
-      {tab === "workspaces" && <WorkspacesTab />}
-      {tab === "audit" && <AuditTab />}
+      {tab === "users" ? (
+        <UsersTab />
+      ) : tab === "requests" ? (
+        <RequestsTab />
+      ) : tab === "workspaces" ? (
+        <WorkspacesTab />
+      ) : (
+        <AuditTab />
+      )}
     </div>
   );
 }
-
 function UsersTab() {
-  const api = useApi();
-  const { me } = useMe();
+  const api = useApi(),
+    act = useAction(),
+    { me } = useMe();
   const [q, setQ] = useState("");
-  const users = useQuery<AdminUser[]>(`/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
-  const act = useAction();
-  const [syncMsg, setSyncMsg] = useState("");
-
+  const [role, setRole] = useState("");
+  const [disabled, setDisabled] = useState("");
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (role) params.set("role", role);
+  if (disabled) params.set("disabled", disabled);
+  const users = useQuery<AdminUser[]>(`/admin/users?${params}`);
   const patch = (email: string, body: object) =>
-    act.run(() => api("PATCH", `/admin/users/${encodeURIComponent(email)}`, body)).then(users.reload);
-
+    void act
+      .run(() =>
+        api("PATCH", `/admin/users/${encodeURIComponent(email)}`, body),
+      )
+      .then(users.reload);
   return (
     <section className="card">
       <div className="row wrap">
-        <input className="grow" placeholder="Tìm email / tên" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button
-          disabled={act.busy}
-          onClick={() =>
-            void act.run(async () => {
-              const r = await api<{ listed: number; missing: number; mode: string }>("POST", "/admin/users/sync");
-              setSyncMsg(`Đồng bộ danh bạ (${r.mode}): ${r.listed} người, ${r.missing} không còn trong danh bạ.`);
-              users.reload();
-            })
-          }
-        >
-          Đồng bộ danh bạ Google
-        </button>
+        <input
+          placeholder="Tìm email / tên"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="">Mọi role</option>
+          <option value="member">Thành viên</option>
+          <option value="workspace_manager">Quản lý workspace</option>
+          <option value="admin">Quản trị viên</option>
+        </select>
+        <select value={disabled} onChange={(e) => setDisabled(e.target.value)}>
+          <option value="">Mọi trạng thái</option>
+          <option value="false">Đang hoạt động</option>
+          <option value="true">Đã vô hiệu hoá</option>
+        </select>
       </div>
-      {syncMsg && <div className="ok">{syncMsg}</div>}
       <ErrorBox error={act.error ?? users.error} />
       {!users.data ? (
         <Loading />
@@ -99,41 +105,161 @@ function UsersTab() {
               <th>Người dùng</th>
               <th>Danh bạ</th>
               <th>Workspace</th>
-              <th>Lần cuối</th>
-              <th>Quyền hệ thống</th>
+              <th>Role</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.data.map((u) => (
+              <tr key={u.email}>
+                <td>
+                  {u.name || "—"}
+                  <div className="small muted">{u.email}</div>
+                </td>
+                <td>
+                  <Badge value={u.directoryStatus} />
+                </td>
+                <td>
+                  {u.workspaces?.map((w) => `${w.name} (${w.role})`).join(", ")}
+                </td>
+                <td>
+                  <select
+                    value={u.role}
+                    disabled={
+                      u.email === "admin@hyperdatalab.org" ||
+                      u.email === me.user.email
+                    }
+                    onChange={(e) => patch(u.email, { role: e.target.value })}
+                  >
+                    <option value="member">member</option>
+                    <option value="workspace_manager">workspace_manager</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </td>
+                <td>
+                  <button
+                    disabled={
+                      u.email === "admin@hyperdatalab.org" ||
+                      u.email === me.user.email
+                    }
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `${u.disabled ? "Mở khoá" : "Vô hiệu hoá"} ${u.email}?`,
+                        )
+                      )
+                        patch(u.email, { disabled: !u.disabled });
+                    }}
+                  >
+                    {u.disabled ? "Enable" : "Disable"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+function RequestsTab() {
+  const api = useApi(),
+    act = useAction();
+  const q = useQuery<WorkspaceRequest[]>(
+    "/admin/workspace-requests?status=pending",
+  );
+  const [edits, setEdits] = useState<
+    Record<string, { name: string; slug: string }>
+  >({});
+  const refresh = () => q.reload();
+  return (
+    <section className="card">
+      <ErrorBox error={act.error ?? q.error} />
+      {!q.data ? (
+        <Loading />
+      ) : q.data.length === 0 ? (
+        <p className="muted">Không có yêu cầu đang chờ.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Người yêu cầu</th>
+              <th>Chi tiết</th>
+              <th>Lý do</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {users.data.map((u) => {
-              const protectedUser = u.email === "admin@hyperdatalab.org" || u.email === me.user.email;
+            {q.data.map((r) => {
+              const e = edits[r.id] ?? { name: r.name, slug: r.slug };
               return (
-                <tr key={u.email} className={u.disabled ? "dim" : ""}>
+                <tr key={r.id}>
                   <td>
-                    {u.name || "—"}
+                    {r.requesterName || r.requester}
                     <div className="small muted">
-                      {u.email} {u.department ? `· ${u.department}` : ""}
+                      {r.requester} · {r.department}
                     </div>
                   </td>
                   <td>
-                    <Badge value={u.directoryStatus} />
+                    <input
+                      value={e.name}
+                      onChange={(x) =>
+                        setEdits({
+                          ...edits,
+                          [r.id]: { ...e, name: x.target.value },
+                        })
+                      }
+                    />
+                    <input
+                      value={e.slug}
+                      onChange={(x) =>
+                        setEdits({
+                          ...edits,
+                          [r.id]: { ...e, slug: x.target.value },
+                        })
+                      }
+                    />
+                    <div>
+                      {r.type} · {r.description}
+                    </div>
                   </td>
-                  <td className="small">
-                    {u.workspaces.map((w) => `${w.name} (${w.role}, ${w.status})`).join("; ") || "—"}
-                  </td>
-                  <td className="small">{fmtDate(u.lastSeen)}</td>
+                  <td>{r.reason || "—"}</td>
                   <td>
-                    <select value={u.globalRole} disabled={protectedUser || act.busy} onChange={(e) => void patch(u.email, { globalRole: e.target.value })}>
-                      <option value="user">user</option>
-                      <option value="admin">admin</option>
-                    </select>
-                  </td>
-                  <td>
-                    {!protectedUser && (
-                      <button className="link" disabled={act.busy} onClick={() => void patch(u.email, { disabled: !u.disabled })}>
-                        {u.disabled ? "Mở khoá" : "Khoá"}
+                    <div className="row">
+                      <button
+                        className="primary"
+                        disabled={act.busy}
+                        onClick={() =>
+                          void act
+                            .run(() =>
+                              api(
+                                "POST",
+                                `/admin/workspace-requests/${r.id}/approve`,
+                                { ...e, note: prompt("Ghi chú") ?? "" },
+                              ),
+                            )
+                            .then(refresh)
+                        }
+                      >
+                        Duyệt
                       </button>
-                    )}
+                      <button
+                        disabled={act.busy}
+                        onClick={() =>
+                          void act
+                            .run(() =>
+                              api(
+                                "POST",
+                                `/admin/workspace-requests/${r.id}/reject`,
+                                { note: prompt("Lý do từ chối") ?? "" },
+                              ),
+                            )
+                            .then(refresh)
+                        }
+                      >
+                        Từ chối
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -144,21 +270,31 @@ function UsersTab() {
     </section>
   );
 }
-
 function WorkspacesTab() {
-  const api = useApi();
-  const list = useQuery<AdminWorkspace[]>("/admin/workspaces");
-  const types = useQuery<WsType[]>("/workspace-types");
-  const act = useAction();
-  const [form, setForm] = useState({ name: "", slug: "", type: "research", description: "", managers: "" });
-  const [newType, setNewType] = useState({ code: "", name: "", description: "" });
-
+  const api = useApi(),
+    act = useAction();
+  const list = useQuery<any[]>("/admin/workspaces");
+  const users = useQuery<AdminUser[]>("/admin/users?disabled=false");
+  const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
+  const [managerSelections, setManagerSelections] = useState<
+    Record<string, string>
+  >({});
+  const [promotionMessage, setPromotionMessage] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    type: "research",
+    description: "",
+    managers: "",
+  });
+  const refresh = () => list.reload();
   return (
     <>
       <section className="card">
         <h3>Tạo workspace</h3>
+        <ErrorBox error={act.error} />
         <form
-          className="stack"
+          className="row wrap"
           onSubmit={(e) => {
             e.preventDefault();
             void act
@@ -168,108 +304,156 @@ function WorkspacesTab() {
                   managers: form.managers.split(/[\s,;]+/).filter(Boolean),
                 }),
               )
-              .then((r) => {
-                if (r !== undefined) setForm({ name: "", slug: "", type: form.type, description: "", managers: "" });
-                list.reload();
-              });
+              .then(refresh);
           }}
         >
-          <div className="row wrap">
-            <input
-              placeholder="Tên"
-              value={form.name}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  name: e.target.value,
-                  slug: form.slug || e.target.value.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-                })
-              }
-              required
-            />
-            <input placeholder="slug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required />
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-              {(types.data ?? []).map((t) => (
-                <option key={t.code} value={t.code}>
-                  {t.name} — {t.defaultPermissions.join(", ")}
-                </option>
-              ))}
-            </select>
-          </div>
-          <input placeholder="Mô tả" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <input
-            placeholder="Email manager (cách nhau bởi dấu phẩy), vd: mai@hyperdatalab.org"
+            required
+            placeholder="Tên"
+            value={form.name}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                name: e.target.value,
+                slug:
+                  form.slug ||
+                  e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+              })
+            }
+          />
+          <input
+            required
+            placeholder="slug"
+            value={form.slug}
+            onChange={(e) => setForm({ ...form, slug: e.target.value })}
+          />
+          <select
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value })}
+          >
+            {(types.data ?? []).map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <input
+            placeholder="Mô tả"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+          <input
+            placeholder="Managers"
             value={form.managers}
             onChange={(e) => setForm({ ...form, managers: e.target.value })}
           />
-          <button className="primary" disabled={act.busy}>
-            Tạo workspace
-          </button>
+          <button className="primary">Tạo</button>
         </form>
       </section>
-      <ErrorBox error={act.error ?? list.error} />
       <section className="card">
-        <h3>Danh sách workspace</h3>
+        <h3>Workspace</h3>
         {!list.data ? (
           <Loading />
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Workspace</th>
-                <th>Loại</th>
-                <th>Quản lý</th>
-                <th className="num">Thành viên</th>
-                <th className="num">Chờ duyệt</th>
-                <th>Quyền bật</th>
+                <th>Tên</th>
+                <th>Managers</th>
+                <th>Thành viên</th>
+                <th>Trạng thái</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {list.data.map((w) => (
-                <tr key={w.id} className={w.status === "archived" ? "dim" : ""}>
+                <tr key={w.id}>
                   <td>
-                    <Link to={`/w/${w.id}/members`}>{w.name}</Link>
+                    {w.name}
                     <div className="small muted">{w.slug}</div>
                   </td>
                   <td>
+                    {(w.managers ?? []).join(", ")}
                     <select
-                      value={w.type}
-                      disabled={act.busy}
-                      onChange={(e) => void act.run(() => api("PATCH", `/admin/workspaces/${w.id}`, { type: e.target.value })).then(list.reload)}
+                      aria-label={`Chọn manager cho ${w.name}`}
+                      value={managerSelections[w.id] ?? ""}
+                      onChange={(event) =>
+                        setManagerSelections({
+                          ...managerSelections,
+                          [w.id]: event.target.value,
+                        })
+                      }
                     >
-                      {(types.data ?? []).map((t) => (
-                        <option key={t.code} value={t.code}>
-                          {t.name}
-                        </option>
-                      ))}
+                      <option value="">Chọn người dùng</option>
+                      {(users.data ?? [])
+                        .filter((user) => !w.managers?.includes(user.email))
+                        .map((user) => (
+                          <option key={user.email} value={user.email}>
+                            {user.name || user.email} ({user.role})
+                          </option>
+                        ))}
                     </select>
-                  </td>
-                  <td className="small">
-                    {w.managers.join(", ") || "—"}
-                    <div>
-                      <button
-                        className="link"
-                        onClick={() => {
-                          const email = prompt("Email manager mới (@hyperdatalab.org)");
-                          if (email) void act.run(() => api("POST", `/admin/workspaces/${w.id}/managers`, { email })).then(list.reload);
-                        }}
-                      >
-                        + Gán manager
-                      </button>
-                    </div>
-                  </td>
-                  <td className="num">{w.memberCount}</td>
-                  <td className="num">{w.pendingCount}</td>
-                  <td className="small">{w.permissions.join(", ") || "—"}</td>
-                  <td>
                     <button
                       className="link"
-                      disabled={act.busy}
+                      disabled={!managerSelections[w.id] || act.busy}
+                      onClick={() => {
+                        const email = managerSelections[w.id];
+                        const selected = users.data?.find(
+                          (user) => user.email === email,
+                        );
+                        if (!email) return;
+                        if (
+                          selected?.role === "member" &&
+                          !confirm(
+                            "Người này sẽ được nâng lên Quản lý workspace",
+                          )
+                        ) {
+                          return;
+                        }
+                        void act
+                          .run(() =>
+                            api<{ promoted: boolean }>(
+                              "POST",
+                              `/admin/workspaces/${w.id}/managers`,
+                              { email },
+                            ),
+                          )
+                          .then((result) => {
+                            if (result) {
+                              setPromotionMessage(
+                                result.promoted
+                                  ? `${email} đã được nâng lên Quản lý workspace.`
+                                  : `${email} đã được thêm làm manager.`,
+                              );
+                              setManagerSelections({
+                                ...managerSelections,
+                                [w.id]: "",
+                              });
+                              refresh();
+                            }
+                          });
+                      }}
+                    >
+                      + Manager
+                    </button>
+                  </td>
+                  <td>
+                    {w.memberCount} · {w.pendingCount} chờ
+                  </td>
+                  <td>
+                    <Badge value={w.status} />
+                  </td>
+                  <td>
+                    <button
                       onClick={() =>
                         void act
-                          .run(() => api("PATCH", `/admin/workspaces/${w.id}`, { status: w.status === "active" ? "archived" : "active" }))
-                          .then(list.reload)
+                          .run(() =>
+                            api("PATCH", `/admin/workspaces/${w.id}`, {
+                              status:
+                                w.status === "active" ? "archived" : "active",
+                            }),
+                          )
+                          .then(refresh)
                       }
                     >
                       {w.status === "active" ? "Lưu trữ" : "Mở lại"}
@@ -281,35 +465,11 @@ function WorkspacesTab() {
           </table>
         )}
       </section>
-      <section className="card">
-        <h3>Loại workspace</h3>
-        <ul>
-          {(types.data ?? []).map((t) => (
-            <li key={t.code}>
-              <b>{t.name}</b> <code>{t.code}</code> — {t.description} <span className="muted small">({t.defaultPermissions.join(", ")})</span>
-            </li>
-          ))}
-        </ul>
-        <form
-          className="row wrap"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void act.run(() => api("POST", "/admin/workspace-types", newType)).then((r) => {
-              if (r !== undefined) setNewType({ code: "", name: "", description: "" });
-              types.reload();
-            });
-          }}
-        >
-          <input placeholder="code" value={newType.code} onChange={(e) => setNewType({ ...newType, code: e.target.value })} required />
-          <input placeholder="Tên" value={newType.name} onChange={(e) => setNewType({ ...newType, name: e.target.value })} required />
-          <input className="grow" placeholder="Mô tả" value={newType.description} onChange={(e) => setNewType({ ...newType, description: e.target.value })} />
-          <button disabled={act.busy}>Thêm loại (mặc định chỉ xem)</button>
-        </form>
-      </section>
+      {promotionMessage && <p className="small ok">{promotionMessage}</p>}
+      <ErrorBox error={act.error ?? users.error} />
     </>
   );
 }
-
 function AuditTab() {
   const q = useQuery<AuditRow[]>("/admin/audit?limit=300");
   return (

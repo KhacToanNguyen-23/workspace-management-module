@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMe } from "../../app/contexts";
-import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../../shared/components/ui";
+import {
+  Badge,
+  ErrorBox,
+  Loading,
+  PageHeader,
+  fmtDate,
+  useAction,
+} from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
 import { ROLE_LABEL, type WorkspaceSummary } from "../../shared/lib/types";
 
@@ -12,6 +19,14 @@ export function OnboardingPage() {
   const list = useQuery<WorkspaceSummary[]>("/workspaces");
   const act = useAction();
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [workspaceForm, setWorkspaceForm] = useState({
+    name: "",
+    slug: "",
+    type: "research",
+    description: "",
+    reason: "",
+  });
+  const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
   const approved = me.memberships.some((m) => m.status === "approved");
 
   const refresh = () => {
@@ -47,7 +62,13 @@ export function OnboardingPage() {
               {me.memberships.map((m) => (
                 <tr key={m.id}>
                   <td>
-                    {m.status === "approved" ? <Link to={`/w/${m.workspace.id}`}>{m.workspace.name}</Link> : m.workspace.name}
+                    {m.status === "approved" ? (
+                      <Link to={`/w/${m.workspace.id}`}>
+                        {m.workspace.name}
+                      </Link>
+                    ) : (
+                      m.workspace.name
+                    )}
                   </td>
                   <td>{ROLE_LABEL[m.role]}</td>
                   <td>
@@ -60,7 +81,16 @@ export function OnboardingPage() {
                       <button
                         className="link"
                         disabled={act.busy}
-                        onClick={() => act.run(() => api("DELETE", `/workspaces/${m.workspace.id}/join`)).then(refresh)}
+                        onClick={() =>
+                          act
+                            .run(() =>
+                              api(
+                                "DELETE",
+                                `/workspaces/${m.workspace.id}/join`,
+                              ),
+                            )
+                            .then(refresh)
+                        }
                       >
                         Rút yêu cầu
                       </button>
@@ -74,6 +104,106 @@ export function OnboardingPage() {
       )}
 
       <ErrorBox error={act.error ?? list.error} />
+      <section className="card">
+        <h3>Xin tạo workspace mới</h3>
+        {me.workspaceRequest && (
+          <p>
+            Yêu cầu gần nhất: <Badge value={me.workspaceRequest.status} />{" "}
+            {me.workspaceRequest.name}{" "}
+            {me.workspaceRequest.decisionNote &&
+              `· ${me.workspaceRequest.decisionNote}`}
+            {me.workspaceRequest.status === "pending" && (
+              <button
+                className="link"
+                onClick={() =>
+                  void act
+                    .run(() =>
+                      api(
+                        "DELETE",
+                        `/workspace-requests/${me.workspaceRequest!.id}`,
+                      ),
+                    )
+                    .then(refresh)
+                }
+              >
+                Rút yêu cầu
+              </button>
+            )}
+          </p>
+        )}
+        {me.workspaceRequest?.status !== "pending" && (
+          <form
+            className="stack"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void act
+                .run(() => api("POST", "/workspace-requests", workspaceForm))
+                .then(refresh);
+            }}
+          >
+            <div className="row wrap">
+              <input
+                placeholder="Tên workspace"
+                required
+                value={workspaceForm.name}
+                onChange={(e) =>
+                  setWorkspaceForm({
+                    ...workspaceForm,
+                    name: e.target.value,
+                    slug:
+                      workspaceForm.slug ||
+                      e.target.value
+                        .toLowerCase()
+                        .normalize("NFD")
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-|-$/g, ""),
+                  })
+                }
+              />
+              <input
+                placeholder="slug"
+                required
+                value={workspaceForm.slug}
+                onChange={(e) =>
+                  setWorkspaceForm({ ...workspaceForm, slug: e.target.value })
+                }
+              />
+              <select
+                value={workspaceForm.type}
+                onChange={(e) =>
+                  setWorkspaceForm({ ...workspaceForm, type: e.target.value })
+                }
+              >
+                {(types.data ?? []).map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <input
+              placeholder="Mô tả"
+              value={workspaceForm.description}
+              onChange={(e) =>
+                setWorkspaceForm({
+                  ...workspaceForm,
+                  description: e.target.value,
+                })
+              }
+            />
+            <textarea
+              placeholder="Lý do xin tạo"
+              value={workspaceForm.reason}
+              onChange={(e) =>
+                setWorkspaceForm({ ...workspaceForm, reason: e.target.value })
+              }
+            />
+            <button className="primary" disabled={act.busy}>
+              Gửi admin duyệt
+            </button>
+          </form>
+        )}
+      </section>
       {!list.data ? (
         <Loading />
       ) : list.data.length === 0 ? (
@@ -81,7 +211,10 @@ export function OnboardingPage() {
       ) : (
         <div className="grid">
           {list.data.map((w) => {
-            const canRequest = !w.myStatus || w.myStatus === "rejected" || w.myStatus === "revoked";
+            const canRequest =
+              !w.myStatus ||
+              w.myStatus === "rejected" ||
+              w.myStatus === "revoked";
             return (
               <article key={w.id} className="card">
                 <div className="row between">
@@ -90,7 +223,8 @@ export function OnboardingPage() {
                 </div>
                 <p className="muted">{w.description || "Không có mô tả."}</p>
                 <p className="small muted">
-                  {w.memberCount} thành viên · Quản lý: {w.managers.join(", ") || "chưa có"}
+                  {w.memberCount} thành viên · Quản lý:{" "}
+                  {w.managers.join(", ") || "chưa có"}
                 </p>
                 {w.myStatus && (
                   <p>
@@ -102,13 +236,21 @@ export function OnboardingPage() {
                     <input
                       placeholder="Lời nhắn cho manager (tuỳ chọn)"
                       value={notes[w.id] ?? ""}
-                      onChange={(e) => setNotes({ ...notes, [w.id]: e.target.value })}
+                      onChange={(e) =>
+                        setNotes({ ...notes, [w.id]: e.target.value })
+                      }
                     />
                     <button
                       className="primary"
                       disabled={act.busy}
                       onClick={() =>
-                        act.run(() => api("POST", `/workspaces/${w.id}/join`, { note: notes[w.id] ?? "" })).then(refresh)
+                        act
+                          .run(() =>
+                            api("POST", `/workspaces/${w.id}/join`, {
+                              note: notes[w.id] ?? "",
+                            }),
+                          )
+                          .then(refresh)
                       }
                     >
                       Gửi yêu cầu tham gia

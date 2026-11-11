@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 /**
  * Single sign-on.
@@ -11,13 +19,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
  *
  * Local development ("dev"): the token is simply `dev:<email>`; the backend must run AUTH_MODE=dev.
  */
-export const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE ?? "dev") as "dev" | "firebase";
+export const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE ?? "dev") as
+  | "dev"
+  | "firebase";
 export const ORG_DOMAIN = import.meta.env.VITE_ORG_DOMAIN ?? "hyperdatalab.org";
 
 export function isOrgEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const at = email.indexOf("@");
-  return at > 0 && at === email.lastIndexOf("@") && email.slice(at + 1).toLowerCase() === ORG_DOMAIN;
+  return (
+    at > 0 &&
+    at === email.lastIndexOf("@") &&
+    email.slice(at + 1).toLowerCase() === ORG_DOMAIN
+  );
 }
 
 interface Session {
@@ -40,7 +54,10 @@ const AuthContext = createContext<AuthState | null>(null);
 const DEV_KEY = "wb-module-dev-email";
 
 async function loadFirebase() {
-  const [{ initializeApp, getApps }, authModule] = await Promise.all([import("firebase/app"), import("firebase/auth")]);
+  const [{ initializeApp, getApps }, authModule] = await Promise.all([
+    import("firebase/app"),
+    import("firebase/auth"),
+  ]);
   const app =
     getApps()[0] ??
     initializeApp({
@@ -72,7 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadFirebase()
       .then(async ({ auth, m }) => {
         // Completes a redirect sign-in (used when the popup is blocked).
-        await m.getRedirectResult(auth).catch((e) => setError(`Đăng nhập thất bại: ${String(e)}`));
+        await m
+          .getRedirectResult(auth)
+          .catch((e) => setError(`Đăng nhập thất bại: ${String(e)}`));
         unsub = m.onAuthStateChanged(auth, async (u) => {
           if (u && !isOrgEmail(u.email)) {
             // The Google account chooser can still return a personal account: end that session at once.
@@ -97,13 +116,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { auth, m } = await loadFirebase();
       const provider = new m.GoogleAuthProvider();
       // hd limits the Google account chooser to the organisation; the backend enforces the domain again.
-      provider.setCustomParameters({ hd: ORG_DOMAIN, prompt: "select_account" });
+      provider.setCustomParameters({
+        hd: ORG_DOMAIN,
+        prompt: "select_account",
+      });
       try {
         await m.signInWithPopup(auth, provider);
       } catch (e) {
         const code = (e as { code?: string }).code;
-        if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
-        if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
+        if (
+          code === "auth/popup-closed-by-user" ||
+          code === "auth/cancelled-popup-request"
+        )
+          return;
+        if (
+          code === "auth/popup-blocked" ||
+          code === "auth/operation-not-supported-in-this-environment"
+        ) {
           await m.signInWithRedirect(auth, provider); // full-page SSO redirect instead of a popup
           return;
         }
@@ -154,7 +183,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ session, ready, error, signInGoogle, signInDev, signOut, getToken }),
+    () => ({
+      session,
+      ready,
+      error,
+      signInGoogle,
+      signInDev,
+      signOut,
+      getToken,
+    }),
     [session, ready, error, signInGoogle, signInDev, signOut, getToken],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
