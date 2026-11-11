@@ -9,7 +9,7 @@ import { AuditTable } from "./Members";
 interface AdminUser {
   email: string;
   name: string;
-  orgUnit: string | null;
+  department: string | null;
   directoryStatus: string;
   globalRole: "user" | "admin";
   disabled: boolean;
@@ -35,7 +35,7 @@ interface WsType {
   code: string;
   name: string;
   description: string;
-  default_permissions: string[];
+  defaultPermissions: string[];
 }
 
 /** Global admin (admin@hyperdatalab.org): directory users, workspaces, managers, audit. */
@@ -45,7 +45,7 @@ export function AdminPage() {
   if (!me.user.isAdmin) return <ErrorBox error="Chỉ admin mới vào được trang này." />;
   return (
     <div>
-      <PageHeader title="Quản trị" sub="Người dùng @hyperdatalab.org, workspace, quyền và nhật ký." />
+      <PageHeader title="Quản trị" sub="Member @hyperdatalab.org, workspace, quyền và nhật ký." />
       <div className="tabs">
         {(["workspaces", "users", "audit"] as const).map((t) => (
           <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
@@ -112,7 +112,7 @@ function UsersTab() {
                   <td>
                     {u.name || "—"}
                     <div className="small muted">
-                      {u.email} {u.orgUnit ? `· ${u.orgUnit}` : ""}
+                      {u.email} {u.department ? `· ${u.department}` : ""}
                     </div>
                   </td>
                   <td>
@@ -191,7 +191,7 @@ function WorkspacesTab() {
             <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
               {(types.data ?? []).map((t) => (
                 <option key={t.code} value={t.code}>
-                  {t.name} — {t.default_permissions.join(", ")}
+                  {t.name} — {t.defaultPermissions.join(", ")}
                 </option>
               ))}
             </select>
@@ -286,7 +286,7 @@ function WorkspacesTab() {
         <ul>
           {(types.data ?? []).map((t) => (
             <li key={t.code}>
-              <b>{t.name}</b> <code>{t.code}</code> — {t.description} <span className="muted small">({t.default_permissions.join(", ")})</span>
+              <b>{t.name}</b> <code>{t.code}</code> — {t.description} <span className="muted small">({t.defaultPermissions.join(", ")})</span>
             </li>
           ))}
         </ul>

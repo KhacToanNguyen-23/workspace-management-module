@@ -5,12 +5,10 @@ import { useQuery } from "./lib/api";
 import { useAuth } from "./lib/auth";
 import type { Me, WorkspaceInfo } from "./lib/types";
 import { AdminPage } from "./pages/Admin";
-import { CorporaPage } from "./pages/Corpora";
-import { CorpusPage } from "./pages/Corpus";
-import { DocumentPage } from "./pages/Document";
 import { LoginPage } from "./pages/Login";
 import { MembersPage } from "./pages/Members";
 import { OnboardingPage } from "./pages/Onboarding";
+import { WorkspaceHomePage } from "./pages/WorkspaceHome";
 
 // ---- current user ----------------------------------------------------------------------
 const MeContext = createContext<{ me: Me; reload(): void } | null>(null);
@@ -44,7 +42,7 @@ function RequireSession({ children }: { children: ReactNode }) {
 function Home() {
   const { me } = useMe();
   const first = me.memberships.find((m) => m.status === "approved" && m.workspace.status === "active");
-  if (first) return <Navigate to={`/w/${first.workspace.id}/corpora`} replace />;
+  if (first) return <Navigate to={`/w/${first.workspace.id}`} replace />;
   if (me.user.isAdmin) return <Navigate to="/admin" replace />;
   return <Navigate to="/onboarding" replace />;
 }
@@ -65,7 +63,7 @@ function Shell() {
           <span>Workspace</span>
           <select
             value={wid ?? ""}
-            onChange={(e) => e.target.value && navigate(`/w/${e.target.value}/corpora`)}
+            onChange={(e) => e.target.value && navigate(`/w/${e.target.value}`)}
           >
             <option value="">— chọn —</option>
             {approved.map((m) => (
@@ -101,7 +99,7 @@ function WorkspaceNav({ wid }: { wid: string }) {
   return (
     <>
       <div className="nav-group">Workspace</div>
-      <NavLink to={`/w/${wid}/corpora`}>Corpus</NavLink>
+      <NavLink to={`/w/${wid}`} end>Tổng quan</NavLink>
       {canManage && <NavLink to={`/w/${wid}/members`}>Thành viên & quyền</NavLink>}
     </>
   );
@@ -142,10 +140,7 @@ export function App() {
         <Route path="onboarding" element={<OnboardingPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route path="w/:wid" element={<WorkspaceRoute />}>
-          <Route index element={<Navigate to="corpora" replace />} />
-          <Route path="corpora" element={<CorporaPage />} />
-          <Route path="corpora/:cid" element={<CorpusPage />} />
-          <Route path="documents/:did" element={<DocumentPage />} />
+          <Route index element={<WorkspaceHomePage />} />
           <Route path="members" element={<MembersPage />} />
         </Route>
       </Route>

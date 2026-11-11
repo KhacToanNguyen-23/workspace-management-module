@@ -1,69 +1,84 @@
-# Writing Bank — Module Workspace & Corpus
+# Writing Bank — Module Member, Workspace & Quyền
 
-Module độc lập, viết để test riêng rồi ghép vào repo Writing Bank. Dùng cùng stack với Writing Bank:
-**React + react-router + Firebase Auth (Google, `hd=hyperdatalab.org`)** ở frontend và **Cloudflare Worker** ở backend
-(thêm D1 làm database và R2 để lưu file).
+Module độc lập, viết để test riêng rồi ghép vào repo Writing Bank.
 
-Module gồm:
+- **Backend:** Java 17 + Spring Boot 3 (`backend/`)
+- **Database:** PostgreSQL 16, schema quản lý bằng Flyway
+- **Frontend:** React + react-router + Vite (`web/`)
+
+Phạm vi hiện tại: **lấy thông tin member, workspace và quản lý quyền**. Phần corpus, fetcher, downloader, extractor chưa làm.
+
+## Module làm gì
 
 | Phần | Nội dung |
 |---|---|
-| **Quản lý user/member** | Chỉ tài khoản `@hyperdatalab.org`. Khi đăng nhập, backend gọi **Google Admin SDK Directory API** để kiểm tra user còn tồn tại và còn active, đồng thời lấy tên và org unit. Có cron đồng bộ toàn bộ danh bạ hằng đêm. `admin@hyperdatalab.org` luôn là admin. |
-| **Workspace** | Admin tạo workspace, chọn **loại** (research / annotation / review, có thể thêm loại mới) và gán manager. User chưa thuộc workspace nào sẽ bị đưa vào màn chọn workspace để **gửi yêu cầu**, và chỉ vào được sau khi **manager duyệt**. |
-| **Phân quyền** | Vai trò trong workspace: viewer < member < manager. Manager **bật/tắt quyền của workspace**. Quyền thực tế = quyền của vai trò ∩ quyền đang bật. Mọi thay đổi đều ghi audit log. |
-| **Corpus** | Danh sách corpus của workspace, kèm số bài theo từng bước của pipeline. |
-| **Fetcher** | Lấy *metadata* từ OpenAlex/Crossref theo từ khoá hoặc danh sách DOI. Có bước xem trước, người dùng tick chọn rồi mới lưu. Tự bỏ qua bài trùng (cùng id hoặc DOI). |
-| **Downloader** | Chỉ tải bài open access có link file (giới hạn 25 MB), lưu file vào R2. |
-| **Extraction** | Bóc text từ PDF (`unpdf`) hoặc HTML, nhận diện section, tách câu (xử lý được e.g., et al., số thập phân), dừng ở phần References. |
+| **Member** | Chỉ tài khoản Google `@hyperdatalab.org` đăng nhập được. Khi đăng nhập, backend gọi **API của bên khác** (user directory) để kiểm tra người đó có đăng ký dưới tên miền và còn active không, rồi lấy tên, phòng ban, ảnh và liên kết với user trong hệ thống. Có đồng bộ toàn bộ danh bạ hằng đêm (02:00) và nút đồng bộ cho admin. |
+| **Workspace** | Workspace là **không gian làm việc riêng của web** (một nhóm trong Writing Bank), không phải Google Workspace. Admin tạo workspace, chọn **loại** (research / review / readonly, thêm được loại mới) và gán manager. |
+| **Vào workspace** | User chưa thuộc workspace nào sẽ bị đưa vào màn chọn workspace để **gửi yêu cầu**. **Manager** của workspace đó duyệt hoặc từ chối. Manager cũng có thể thu hồi, đổi vai trò, hoặc thêm thẳng một member. |
+| **Quyền** | Vai trò trong workspace: viewer < member < manager. Manager **bật/tắt quyền của workspace**. Quyền thực tế của một người = quyền của vai trò ∩ quyền workspace đang bật. Chỉ admin gán hoặc gỡ manager. |
+| **Admin** | `admin@hyperdatalab.org` luôn là admin: xem toàn bộ member, khoá/mở khoá, nâng người khác làm admin, tạo/lưu trữ workspace, xem nhật ký. Mọi thay đổi đều ghi audit log. |
+
+### Bảng quyền
+
+| Mã quyền | Ý nghĩa | viewer | member | manager |
+|---|---|---|---|---|
+| `workspace.read` | Xem nội dung | ✓ | ✓ | ✓ |
+| `workspace.write` | Tạo / sửa nội dung | | ✓ | ✓ |
+| `workspace.review` | Duyệt nội dung | | ✓ | ✓ |
+| `members.manage` | Duyệt yêu cầu, quản lý thành viên, bật/tắt quyền | | | ✓ |
+
+Ba quyền `workspace.*` chỉ có hiệu lực khi manager bật cho workspace. `members.manage` không bị tắt được, để manager luôn bật lại được quyền.
 
 ## Chạy local
 
+Cần Java 17, Maven, Node 20+, Docker.
+
 ```bash
 npm install
-npm run db:migrate -w worker      # tạo D1 local
-npm run dev:worker                # http://127.0.0.1:8787
-npm run dev:web                   # http://localhost:5174
+npm run db:up          # PostgreSQL ở cổng 5433
+npm run dev:backend    # http://localhost:8080 (Flyway tự tạo bảng)
+npm run dev:web        # http://localhost:5174
 ```
 
-Ở local, mặc định `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`. Màn đăng nhập hiện ô nhập email; mọi địa chỉ
-`@hyperdatalab.org` đều được coi là active. Muốn giả lập danh bạ cụ thể, đặt `DIRECTORY_MOCK` trong
-`worker/.dev.vars` (xem `.dev.vars.example`).
+Mặc định local chạy `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`: màn đăng nhập là ô nhập email, và mọi địa chỉ `@hyperdatalab.org` đều được coi là active.
 
 Kịch bản thử:
-1. Đăng nhập `admin@hyperdatalab.org`, vào **Quản trị**, tạo workspace và gán manager (ví dụ `mai@hyperdatalab.org`).
-2. Đăng nhập `alice@hyperdatalab.org`: alice bị đưa vào **Tham gia workspace** và gửi yêu cầu.
-3. Đăng nhập `mai@...`, vào **Thành viên & quyền** và duyệt alice.
-4. alice tạo corpus, chạy **Fetcher** (xem trước rồi lưu), **Tải file**, rồi **Chạy extraction**, và mở tài liệu để xem các câu.
+1. Đăng nhập `admin@hyperdatalab.org` → **Quản trị** → tạo workspace, gán manager (ví dụ `mai@hyperdatalab.org`).
+2. Đăng nhập `alice@hyperdatalab.org` → bị đưa vào **Tham gia workspace** → gửi yêu cầu.
+3. Đăng nhập `mai@...` → **Thành viên & quyền** → duyệt alice, thử bật/tắt quyền.
+4. Đăng nhập lại alice → trang **Tổng quan** hiện quyền của alice và danh sách thành viên.
 
-## Kiểm tra
+## Test
 
 ```bash
-npm test          # 33 test: identity, directory, workspace, duyệt, quyền, fetch→download→extract
-npm run typecheck
-npm run build
+docker compose exec -T postgres psql -U wb -d wb_module -c "CREATE DATABASE wb_module_test"   # chạy một lần
+npm test
 ```
 
-Test chạy trên SQLite có sẵn trong Node (`node:sqlite`, cần Node ≥ 22.5), dùng đúng file migration của D1.
-Các API bên ngoài (OpenAlex, Google Directory, downloader) đều được thay bằng bản giả trong test.
+33 test: 28 test API chạy trên PostgreSQL thật (database `wb_module_test`), 5 unit test (mô hình quyền, client gọi user directory qua HTTP).
 
-## Cấu hình production
+## Cấu hình (biến môi trường)
 
-Các biến trong `worker/wrangler.toml`:
-
-| Biến | Production |
-|---|---|
-| `AUTH_MODE` | `firebase`: verify Firebase ID token của project `hyperdatalab-writing-bank` |
-| `DIRECTORY_MODE` | `google` |
-| `GOOGLE_SA_KEY` (secret) | JSON của service account đã bật **domain-wide delegation** với scope `https://www.googleapis.com/auth/admin.directory.user.readonly`. Request được gửi dưới danh nghĩa `ADMIN_EMAIL`. |
-| `ADMIN_EMAIL` | `admin@hyperdatalab.org` |
-| `CORS_ORIGIN` | origin của web, ví dụ `https://hyperdatalab-writing-bank.web.app` |
-| `API_CONTACT_EMAIL` | (tuỳ chọn) email liên hệ gửi kèm request tới OpenAlex/Crossref để vào polite pool |
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `DB_URL`, `DB_USER`, `DB_PASSWORD` | Postgres local cổng 5433 | Kết nối PostgreSQL |
+| `AUTH_MODE` | `dev` | `firebase` ở production: verify Firebase ID token của project `hyperdatalab-writing-bank` |
+| `DIRECTORY_MODE` | `mock` | Nguồn thông tin member: `http`, `google`, `mock`, `off` |
+| `DIRECTORY_HTTP_BASE_URL`, `DIRECTORY_HTTP_TOKEN` | | Dùng với `http` |
+| `GOOGLE_SA_FILE` | | Dùng với `google`: đường dẫn file JSON của service account |
+| `CORS_ORIGIN` | `http://localhost:5174` | Origin của web |
 
 Phía web (`web/.env.local`): `VITE_AUTH_MODE=firebase` và các biến `VITE_FIREBASE_*`.
 
-Bật Directory API (việc admin Google Workspace phải làm):
-1. Trong Google Cloud: tạo service account, bật *Admin SDK API*, tạo key JSON.
-2. Trong Admin console: Security → API controls → Domain-wide delegation, thêm client ID của service account với scope ở trên.
-3. `npx wrangler secret put GOOGLE_SA_KEY` (dán JSON vào).
+### Nguồn thông tin member (`DIRECTORY_MODE`)
 
-Xem [docs/INTEGRATION.md](docs/INTEGRATION.md) để biết cách ghép module vào repo Writing Bank.
+- **`http`** — một REST API bất kỳ biết danh sách user của tên miền:
+  - `GET {baseUrl}/users/{email}` → `200 {email, name, photoUrl, department, suspended}` hoặc `404`
+  - `GET {baseUrl}/users?domain=hyperdatalab.org` → mảng các object như trên (hoặc `{"users": [...]}`)
+  - Gửi kèm `Authorization: Bearer {token}` nếu có cấu hình token.
+- **`google`** — Google Admin SDK Directory API, qua service account có domain-wide delegation với scope `admin.directory.user.readonly`, chạy dưới danh nghĩa `admin@hyperdatalab.org`. Chỉ đọc danh sách tài khoản của tên miền.
+- **`mock`** — danh sách trong `app.directory.mock-users` (xem `backend/src/test/resources/application-test.yml`).
+
+Muốn nối API khác: implement interface `UserDirectory` (2 hàm `find`, `listAll`) và đăng ký trong `DirectoryConfig`.
+
+Xem [docs/INTEGRATION.md](docs/INTEGRATION.md) để biết danh sách API và cách ghép vào repo Writing Bank.

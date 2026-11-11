@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174,
-    // Local: the Worker runs on 8787 (`npm run dev:worker`).
-    proxy: { "/api": "http://127.0.0.1:8787" },
+    // Local: the Java backend runs on 8080 (`npm run dev:backend`).
+    proxy: { "/api": "http://127.0.0.1:8080" },
   },
 });

@@ -1,10 +1,4 @@
-export type Permission =
-  | "corpus.read"
-  | "corpus.write"
-  | "corpus.fetch"
-  | "corpus.download"
-  | "extraction.run"
-  | "members.manage";
+export type Permission = "workspace.read" | "workspace.write" | "workspace.review" | "members.manage";
 
 export type WorkspaceRole = "viewer" | "member" | "manager";
 export type MembershipStatus = "pending" | "approved" | "rejected" | "revoked";
@@ -14,7 +8,7 @@ export interface Me {
     email: string;
     name: string;
     photoUrl: string | null;
-    orgUnit: string | null;
+    department: string | null;
     isAdmin: boolean;
     directoryStatus: string;
   };
@@ -50,62 +44,11 @@ export interface WorkspaceInfo {
   toggleablePermissions: Permission[];
 }
 
-export interface Corpus {
-  id: string;
-  name: string;
-  description: string;
-  createdBy: string;
-  createdAt: string;
-  total: number;
-  fetched: number;
-  downloaded: number;
-  extracted: number;
-  failed: number;
-  sentences: number;
-}
-
-export type DocStatus = "fetched" | "downloaded" | "download_failed" | "extracted" | "extract_failed";
-
-export interface DocumentRow {
-  id: string;
-  source: string;
-  externalId: string;
-  doi: string | null;
-  title: string;
-  authors: string[];
-  year: number | null;
-  venue: string | null;
-  license: string | null;
-  isOa: boolean;
-  oaUrl: string | null;
-  status: DocStatus;
-  error: string | null;
-  contentType: string | null;
-  contentBytes: number | null;
-  sentenceCount: number;
-  fetchedAt: string;
-}
-
-export interface FetchedRecord {
-  source: string;
-  externalId: string;
-  doi: string | null;
-  title: string;
-  authors: string[];
-  year: number | null;
-  venue: string | null;
-  abstract: string | null;
-  license: string | null;
-  isOa: boolean;
-  oaUrl: string | null;
-  inCorpus: boolean;
-}
-
 export interface MemberRow {
   id: string;
   email: string;
   name: string;
-  orgUnit: string | null;
+  department: string | null;
   directoryStatus: string;
   role: WorkspaceRole;
   status: MembershipStatus;
@@ -122,16 +65,22 @@ export interface AuditRow {
   actor: string;
   action: string;
   target: string;
-  workspace_id: string | null;
+  workspaceId: string | null;
   detail: Record<string, unknown>;
 }
 
+export interface Person {
+  email: string;
+  name: string;
+  department: string | null;
+  photoUrl: string | null;
+  role: WorkspaceRole;
+}
+
 export const PERMISSION_LABEL: Record<Permission, string> = {
-  "corpus.read": "Xem corpus",
-  "corpus.write": "Tạo/xoá corpus",
-  "corpus.fetch": "Fetch metadata",
-  "corpus.download": "Tải file (downloader)",
-  "extraction.run": "Chạy extraction",
+  "workspace.read": "Xem nội dung",
+  "workspace.write": "Tạo / sửa nội dung",
+  "workspace.review": "Duyệt nội dung",
   "members.manage": "Quản lý thành viên",
 };
 
@@ -142,9 +91,8 @@ export const STATUS_LABEL: Record<string, string> = {
   approved: "Đã duyệt",
   rejected: "Từ chối",
   revoked: "Đã thu hồi",
-  fetched: "Đã fetch",
-  downloaded: "Đã tải",
-  download_failed: "Tải lỗi",
-  extracted: "Đã trích",
-  extract_failed: "Trích lỗi",
+  active: "Đang hoạt động",
+  suspended: "Bị đình chỉ",
+  missing: "Không có trong danh bạ",
+  unknown: "Chưa kiểm tra",
 };

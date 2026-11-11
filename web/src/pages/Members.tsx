@@ -66,7 +66,7 @@ export function MembersPage() {
                   <td>
                     {m.name || m.email}
                     <div className="small muted">
-                      {m.email} {m.orgUnit ? `· ${m.orgUnit}` : ""}
+                      {m.email} {m.department ? `· ${m.department}` : ""}
                     </div>
                   </td>
                   <td>{m.note || "—"}</td>
@@ -192,7 +192,7 @@ export function MembersPage() {
       <section className="card">
         <h3>Quyền của workspace</h3>
         <p className="muted small">
-          Quyền thực tế của mỗi người = quyền theo vai trò ∩ quyền bật ở đây. Người xem chỉ có "Xem corpus"; thành viên có fetch, tải, trích; quản lý luôn giữ quyền quản lý thành viên.
+          Quyền thực tế của mỗi người = quyền theo vai trò ∩ quyền bật ở đây. Người xem chỉ có quyền xem; thành viên có xem, sửa, duyệt; quản lý luôn giữ quyền quản lý thành viên.
         </p>
         <div className="perm-grid">
           {info.toggleablePermissions.map((p) => (

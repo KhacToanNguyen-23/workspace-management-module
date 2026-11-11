@@ -1,14 +1,15 @@
 {
   "name": "writingbank-modules",
   "private": true,
-  "version": "0.1.0",
-  "description": "Standalone Writing Bank module: members, workspaces, permissions, corpus (fetcher, downloader, extraction).",
-  "workspaces": ["worker", "web"],
+  "version": "0.2.0",
+  "description": "Standalone Writing Bank module: members (org user directory), web workspaces and permissions. Java backend + React frontend.",
+  "workspaces": ["web"],
   "scripts": {
-    "dev:worker": "npm run dev -w worker",
+    "db:up": "docker compose up -d postgres",
+    "dev:backend": "cd backend && mvn spring-boot:run",
     "dev:web": "npm run dev -w web",
-    "test": "npm test -w worker",
-    "typecheck": "npm run typecheck -w worker && npm run typecheck -w web",
+    "test": "cd backend && mvn -B test",
+    "typecheck": "npm run typecheck -w web",
     "build": "npm run build -w web"
   }
 }

@@ -47,7 +47,7 @@ export function OnboardingPage() {
               {me.memberships.map((m) => (
                 <tr key={m.id}>
                   <td>
-                    {m.status === "approved" ? <Link to={`/w/${m.workspace.id}/corpora`}>{m.workspace.name}</Link> : m.workspace.name}
+                    {m.status === "approved" ? <Link to={`/w/${m.workspace.id}`}>{m.workspace.name}</Link> : m.workspace.name}
                   </td>
                   <td>{ROLE_LABEL[m.role]}</td>
                   <td>

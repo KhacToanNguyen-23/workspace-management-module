@@ -27,7 +27,7 @@ export function LoginPage() {
               signInDev(email);
             }}
           >
-            <div className="notice">Chế độ dev: nhập email để giả lập đăng nhập (worker phải chạy AUTH_MODE=dev).</div>
+            <div className="notice">Chế độ dev: nhập email để giả lập đăng nhập (backend phải chạy AUTH_MODE=dev).</div>
             <label className="field">
               <span>Email</span>
               <input value={email} onChange={(e) => setEmail(e.target.value)} />
