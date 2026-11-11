@@ -4,12 +4,6 @@ server:
 spring:
   application:
     name: wb-module
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/wb_module}
-    username: ${DB_USER:wb}
-    password: ${DB_PASSWORD:wb_local_only}
-  flyway:
-    enabled: true
   jackson:
     default-property-inclusion: always
   servlet:
@@ -17,6 +11,10 @@ spring:
       enabled: false
 
 app:
+  firestore:
+    project-id: ${FIRESTORE_PROJECT_ID:hyperdatalab-writing-bank}
+    emulator-host: ${FIRESTORE_EMULATOR_HOST:}
+    credentials-file: ${GOOGLE_APPLICATION_CREDENTIALS:}
   org-domain: hyperdatalab.org
   admin-email: admin@hyperdatalab.org
   auth:

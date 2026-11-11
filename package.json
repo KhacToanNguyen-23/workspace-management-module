@@ -5,8 +5,8 @@
   "description": "Standalone Writing Bank module: members (org user directory), web workspaces and permissions. Java backend + React frontend.",
   "workspaces": ["web"],
   "scripts": {
-    "db:up": "docker compose up -d postgres",
-    "dev:backend": "cd backend && mvn spring-boot:run",
+    "db:up": "docker compose up -d firestore",
+    "dev:backend": "powershell -NoProfile -Command \"$env:FIRESTORE_EMULATOR_HOST='localhost:8085'; cd backend; mvn spring-boot:run\"",
     "dev:web": "npm run dev -w web",
     "test": "cd backend && mvn -B test",
     "typecheck": "npm run typecheck -w web",

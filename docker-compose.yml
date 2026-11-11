@@ -1,17 +1,6 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: wb_module
-      POSTGRES_USER: wb
-      POSTGRES_PASSWORD: wb_local_only
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud emulators firestore start --host-port=0.0.0.0:8085
     ports:
-      - "5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wb -d wb_module"]
-      interval: 3s
-      retries: 20
-volumes:
-  pgdata:
+      - "8085:8085"

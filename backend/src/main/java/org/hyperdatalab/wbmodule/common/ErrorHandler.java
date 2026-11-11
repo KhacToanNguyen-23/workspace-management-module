@@ -1,7 +1,5 @@
 package org.hyperdatalab.wbmodule.common;
 
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -12,6 +10,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ErrorHandler {
@@ -28,15 +29,18 @@ public class ErrorHandler {
 
     @ExceptionHandler(org.hyperdatalab.wbmodule.directory.UserDirectory.DirectoryException.class)
     ResponseEntity<Object> directory(RuntimeException e) {
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body("directory_error", e.getMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(body("directory_error", e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<Object> invalid(MethodArgumentNotValidException e) {
-        String msg = e.getBindingResult().getFieldErrors().stream()
-                .map(f -> f.getField() + ": " + f.getDefaultMessage())
-                .collect(Collectors.joining("; "));
-        return ResponseEntity.unprocessableEntity().body(body("validation", msg.isEmpty() ? "Invalid body." : msg));
+        String msg =
+                e.getBindingResult().getFieldErrors().stream()
+                        .map(f -> f.getField() + ": " + f.getDefaultMessage())
+                        .collect(Collectors.joining("; "));
+        return ResponseEntity.unprocessableEntity()
+                .body(body("validation", msg.isEmpty() ? "Invalid body." : msg));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -51,12 +55,14 @@ public class ErrorHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     ResponseEntity<Object> noRoute(NoResourceFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body("not_found", "No such route."));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(body("not_found", "No such route."));
     }
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> other(Exception e) {
         log.error("Unhandled error", e);
-        return ResponseEntity.internalServerError().body(body("internal", "Unexpected server error."));
+        return ResponseEntity.internalServerError()
+                .body(body("internal", "Unexpected server error."));
     }
 }

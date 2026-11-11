@@ -1,29 +1,25 @@
 package org.hyperdatalab.wbmodule.workspace;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.cloud.Timestamp;
+import com.google.cloud.firestore.DocumentSnapshot;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+
 import org.hyperdatalab.wbmodule.auth.AuthedUser;
 import org.hyperdatalab.wbmodule.common.ApiException;
 import org.hyperdatalab.wbmodule.common.AppProperties;
 import org.hyperdatalab.wbmodule.identity.AuditService;
 import org.hyperdatalab.wbmodule.identity.IdentityService;
-import org.springframework.http.HttpStatus;
+import org.hyperdatalab.wbmodule.store.FirestoreStore;
+import org.hyperdatalab.wbmodule.store.MembershipStore;
+import org.hyperdatalab.wbmodule.store.UserStore;
+import org.hyperdatalab.wbmodule.store.WorkspaceRequestStore;
+import org.hyperdatalab.wbmodule.store.WorkspaceStore;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,241 +29,484 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Global administration (admin@hyperdatalab.org and promoted admins): users, workspaces, managers, audit. */
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/** Administrative endpoints for users, workspaces, creation requests and audit history. */
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
-
-    private final JdbcClient db;
+    private final FirestoreStore store;
     private final IdentityService identity;
     private final AuditService audit;
     private final AppProperties props;
-    private final ObjectMapper json;
+    private final WorkspaceService workspaces;
+    private final UserStore users;
+    private final WorkspaceStore workspaceStore;
+    private final MembershipStore memberships;
+    private final WorkspaceRequestStore workspaceRequests;
 
-    public AdminController(JdbcClient db, IdentityService identity, AuditService audit, AppProperties props, ObjectMapper json) {
-        this.db = db;
-        this.identity = identity;
-        this.audit = audit;
-        this.props = props;
-        this.json = json;
+    public AdminController(
+            FirestoreStore s,
+            IdentityService i,
+            AuditService a,
+            AppProperties p,
+            WorkspaceService w,
+            UserStore users,
+            WorkspaceStore workspaceStore,
+            MembershipStore memberships,
+            WorkspaceRequestStore workspaceRequests) {
+        store = s;
+        identity = i;
+        audit = a;
+        props = p;
+        workspaces = w;
+        this.users = users;
+        this.workspaceStore = workspaceStore;
+        this.memberships = memberships;
+        this.workspaceRequests = workspaceRequests;
     }
 
-    private static void requireAdmin(AuthedUser user) {
-        if (!user.admin()) throw ApiException.forbidden("admin_only", "Administrators only.");
+    private static void admin(AuthedUser u) {
+        if (!u.admin()) throw ApiException.forbidden("admin_only", "Administrators only.");
     }
 
-    // ---- users ---------------------------------------------------------------------------
-
-    record UserWorkspace(String name, String role, String status) {}
-
-    record AdminUser(String email, String name, String department, String directoryStatus, String globalRole,
-                     boolean disabled, OffsetDateTime firstSeen, OffsetDateTime lastSeen, OffsetDateTime syncedAt,
-                     List<UserWorkspace> workspaces) {}
-
+    /** Lists users with optional role, disabled-state and text filters. */
     @GetMapping("/users")
-    List<AdminUser> users(AuthedUser user, @RequestParam(required = false) String q, @RequestParam(required = false) String status) {
-        requireAdmin(user);
-        String like = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
-        List<AdminUser> rows = db.sql("""
-                SELECT * FROM users
-                 WHERE (CAST(:q AS TEXT) IS NULL OR email LIKE :q OR LOWER(name) LIKE :q)
-                   AND (CAST(:status AS TEXT) IS NULL OR directory_status = :status)
-                 ORDER BY email LIMIT 2000
-                """).param("q", like).param("status", status)
-                .query((rs, i) -> new AdminUser(rs.getString("email"), rs.getString("name"), rs.getString("department"),
-                        rs.getString("directory_status"), rs.getString("global_role"), rs.getBoolean("disabled"),
-                        rs.getObject("first_seen", OffsetDateTime.class), rs.getObject("last_seen", OffsetDateTime.class),
-                        rs.getObject("synced_at", OffsetDateTime.class), new ArrayList<>()))
-                .list();
-        Map<String, AdminUser> byEmail = new LinkedHashMap<>();
-        rows.forEach(r -> byEmail.put(r.email(), r));
-        db.sql("""
-                SELECT m.user_email, w.name, m.role, m.status FROM memberships m JOIN workspaces w ON w.id = m.workspace_id
-                 ORDER BY w.name
-                """).query((rs, i) -> {
-                    AdminUser u = byEmail.get(rs.getString("user_email"));
-                    if (u != null) u.workspaces().add(new UserWorkspace(rs.getString("name"), rs.getString("role"), rs.getString("status")));
-                    return null;
-                }).list();
-        return rows;
+    List<Map<String, Object>> users(
+            AuthedUser u,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) Boolean disabled) {
+        admin(u);
+        String needle = q == null ? "" : q.toLowerCase(Locale.ROOT);
+        return store.all("users").stream()
+                .map(
+                        s -> {
+                            Map<String, Object> x = FirestoreStore.data(s);
+                            x.put("email", s.getId());
+                            List<Map<String, Object>> ws = new ArrayList<>();
+                            for (DocumentSnapshot m :
+                                    store.equal("memberships", "userEmail", s.getId())) {
+                                Map<String, Object> w =
+                                        store.get("workspaces", m.getString("workspaceId"))
+                                                .orElse(Map.of());
+                                ws.add(
+                                        Map.of(
+                                                "name",
+                                                w.getOrDefault("name", ""),
+                                                "role",
+                                                m.getString("role"),
+                                                "status",
+                                                m.getString("status")));
+                            }
+                            x.put("workspaces", ws);
+                            return x;
+                        })
+                .filter(
+                        x ->
+                                needle.isBlank()
+                                        || String.valueOf(x.get("email"))
+                                                .toLowerCase(Locale.ROOT)
+                                                .contains(needle)
+                                        || String.valueOf(x.get("name"))
+                                                .toLowerCase(Locale.ROOT)
+                                                .contains(needle))
+                .filter(x -> role == null || role.equals(x.get("role")))
+                .filter(x -> disabled == null || disabled.equals(x.get("disabled")))
+                .limit(2000)
+                .toList();
     }
 
+    /** Synchronizes the directory snapshot into user records. */
     @PostMapping("/users/sync")
-    IdentityService.SyncResult sync(AuthedUser user) {
-        requireAdmin(user);
-        return identity.syncDirectory(user.email());
+    IdentityService.SyncResult sync(AuthedUser u) {
+        admin(u);
+        return identity.syncDirectory(u.email());
     }
 
-    /** Re-reads one user from the user directory right now (ignores the cache). */
+    /** Refreshes one user's profile from the organization directory. */
     @PostMapping("/users/{email}/refresh")
-    @Transactional
-    Map<String, Object> refreshUser(AuthedUser user, @PathVariable String email) {
-        requireAdmin(user);
-        String target = email.toLowerCase(Locale.ROOT);
-        String status = identity.refreshFromDirectory(target);
-        audit.log(user.email(), "user.refresh", target, null, Map.of("directoryStatus", status));
-        return Map.of("email", target, "directoryStatus", status);
+    Map<String, Object> refresh(AuthedUser u, @PathVariable String email) {
+        admin(u);
+        String e = email.toLowerCase(Locale.ROOT), status = identity.refreshFromDirectory(e);
+        audit.log(u.email(), "user.refresh", e, null, Map.of("directoryStatus", status));
+        return Map.of("email", e, "directoryStatus", status);
     }
 
-    record UserPatch(Boolean disabled, @Pattern(regexp = "user|admin") String globalRole) {}
+    record UserPatch(
+            @Pattern(regexp = "member|workspace_manager|admin") String role, Boolean disabled) {}
 
+    /** Changes a user's global role or sign-in status. */
     @PatchMapping("/users/{email}")
-    @Transactional
-    Map<String, Object> patchUser(AuthedUser user, @PathVariable String email, @Valid @RequestBody UserPatch patch) {
-        requireAdmin(user);
-        String target = email.toLowerCase(Locale.ROOT);
-        identity.find(target).orElseThrow(() -> ApiException.notFound("User not found."));
-        if (target.equalsIgnoreCase(props.adminEmail())) throw ApiException.conflict("protected", "The domain admin account cannot be changed here.");
-        if (target.equals(user.email()) && "user".equals(patch.globalRole())) throw ApiException.conflict("self_change", "You cannot remove your own admin role.");
-        db.sql("UPDATE users SET disabled = COALESCE(?, disabled), global_role = COALESCE(?, global_role) WHERE email = ?")
-                .params(patch.disabled(), patch.globalRole(), target).update();
-        Map<String, Object> detail = new LinkedHashMap<>();
-        if (patch.disabled() != null) detail.put("disabled", patch.disabled());
-        if (patch.globalRole() != null) detail.put("globalRole", patch.globalRole());
-        audit.log(user.email(), "user.update", target, null, detail);
-        Map<String, Object> out = new LinkedHashMap<>(detail);
-        out.put("email", target);
-        return out;
+    Map<String, Object> patchUser(
+            AuthedUser u, @PathVariable String email, @Valid @RequestBody UserPatch p) {
+        admin(u);
+        String e = email.toLowerCase(Locale.ROOT);
+        Map<String, Object> current =
+                store.get("users", e).orElseThrow(() -> ApiException.notFound("User not found."));
+        if (e.equalsIgnoreCase(props.adminEmail()))
+            throw ApiException.conflict(
+                    "protected", "The domain admin account cannot be changed here.");
+        if (e.equals(u.email())
+                && ((p.disabled() != null && p.disabled())
+                        || (p.role() != null && !p.role().equals("admin"))))
+            throw ApiException.conflict(
+                    "self_change", "You cannot disable or lower your own account.");
+        return store.transaction(
+                tx -> {
+                    if (p.role() != null
+                            && p.role().equals("member")
+                            && !"member".equals(current.get("role"))) {
+                        List<String> blocked = new ArrayList<>();
+                        for (WorkspaceStore.Workspace workspace : workspaceStore.managedBy(e)) {
+                            if ("active".equals(workspace.status())
+                                    && workspace.managerEmails().size() == 1) {
+                                blocked.add(workspace.name());
+                            }
+                        }
+                        if (!blocked.isEmpty())
+                            throw ApiException.conflict(
+                                    "still_managing",
+                                    "Still the only manager of: " + String.join(", ", blocked));
+                        for (WorkspaceStore.Workspace workspace : workspaceStore.managedBy(e)) {
+                            String wid = workspace.id();
+                            memberships.demoteToMember(tx, wid + "_" + e);
+                            List<String> managers = new ArrayList<>(workspace.managerEmails());
+                            managers.remove(e);
+                            workspaceStore.updateManagerEmails(tx, wid, managers);
+                        }
+                    }
+                    if (p.role() != null) {
+                        users.updateRole(tx, e, p.role());
+                        audit.log(
+                                tx,
+                                u.email(),
+                                "user.role",
+                                e,
+                                null,
+                                Map.of("from", current.get("role"), "to", p.role()));
+                    }
+                    if (p.disabled() != null) {
+                        users.setDisabled(tx, e, p.disabled(), u.email());
+                        audit.log(
+                                tx,
+                                u.email(),
+                                p.disabled() ? "user.disable" : "user.enable",
+                                e,
+                                null,
+                                Map.of());
+                    }
+                    Map<String, Object> out = new HashMap<>();
+                    out.put("email", e);
+                    out.put("role", p.role() == null ? current.get("role") : p.role());
+                    out.put(
+                            "disabled",
+                            p.disabled() == null
+                                    ? current.getOrDefault("disabled", false)
+                                    : p.disabled());
+                    return out;
+                });
     }
 
-    // ---- workspace types -----------------------------------------------------------------
+    record TypeBody(
+            @NotBlank @Pattern(regexp = "[a-z][a-z0-9_-]{1,30}") String code,
+            @NotBlank @Size(max = 60) String name,
+            @Size(max = 300) String description) {}
 
-    record TypeBody(@NotBlank @Pattern(regexp = "[a-z][a-z0-9_-]{1,30}") String code, @NotBlank @Size(max = 60) String name,
-                    @Size(max = 300) String description, List<@Pattern(regexp = org.hyperdatalab.wbmodule.common.Permissions.TOGGLEABLE_PATTERN) String> defaultPermissions) {}
-
+    /** Adds a workspace type. */
     @PostMapping("/workspace-types")
-    @Transactional
-    ResponseEntity<TypeBody> createType(AuthedUser user, @Valid @RequestBody TypeBody t) {
-        requireAdmin(user);
-        if (db.sql("SELECT 1 FROM workspace_types WHERE code = ?").param(t.code()).query(Integer.class).optional().isPresent()) {
-            throw ApiException.conflict("duplicate", "Type code already exists.");
-        }
-        List<String> perms = t.defaultPermissions() == null ? List.of("workspace.read") : t.defaultPermissions();
-        db.sql("INSERT INTO workspace_types (code, name, description, default_permissions) VALUES (?, ?, ?, ?)")
-                .params(t.code(), t.name(), t.description() == null ? "" : t.description(), perms.toArray(String[]::new)).update();
-        audit.log(user.email(), "workspace_type.create", t.code(), null, Map.of("name", t.name(), "defaultPermissions", perms));
-        return ResponseEntity.status(HttpStatus.CREATED).body(new TypeBody(t.code(), t.name(), t.description(), perms));
+    ResponseEntity<TypeBody> type(AuthedUser u, @Valid @RequestBody TypeBody b) {
+        admin(u);
+        store.transaction(
+                tx -> {
+                    if (workspaceStore.typeExists(tx, b.code()))
+                        throw ApiException.conflict("duplicate", "Type already exists.");
+                    workspaceStore.createType(
+                            tx,
+                            new WorkspaceStore.WorkspaceType(b.code(), b.name(), b.description()));
+                    audit.log(
+                            tx,
+                            u.email(),
+                            "workspace_type.create",
+                            b.code(),
+                            null,
+                            Map.of("name", b.name()));
+                    return null;
+                });
+        return ResponseEntity.status(201).body(b);
     }
 
-    // ---- workspaces ----------------------------------------------------------------------
-
-    record AdminWorkspace(UUID id, String slug, String name, String type, String description, String status,
-                          String createdBy, OffsetDateTime createdAt, int memberCount, int pendingCount,
-                          List<String> managers, List<String> permissions) {}
-
+    /** Lists all workspaces for the admin console. */
     @GetMapping("/workspaces")
-    List<AdminWorkspace> workspaces(AuthedUser user) {
-        requireAdmin(user);
-        return db.sql("""
-                SELECT w.*,
-                  (SELECT COUNT(*) FROM memberships m WHERE m.workspace_id = w.id AND m.status = 'approved') AS member_count,
-                  (SELECT COUNT(*) FROM memberships m WHERE m.workspace_id = w.id AND m.status = 'pending') AS pending_count,
-                  ARRAY(SELECT m.user_email FROM memberships m WHERE m.workspace_id = w.id AND m.status = 'approved'
-                          AND m.role = 'manager' ORDER BY m.user_email) AS managers,
-                  ARRAY(SELECT p.permission FROM workspace_permissions p WHERE p.workspace_id = w.id ORDER BY p.permission) AS permissions
-                FROM workspaces w ORDER BY w.status, w.name
-                """).query((rs, i) -> new AdminWorkspace(rs.getObject("id", UUID.class), rs.getString("slug"),
-                        rs.getString("name"), rs.getString("type"), rs.getString("description"), rs.getString("status"),
-                        rs.getString("created_by"), rs.getObject("created_at", OffsetDateTime.class),
-                        rs.getInt("member_count"), rs.getInt("pending_count"),
-                        MeController.textArray(rs.getArray("managers")), MeController.textArray(rs.getArray("permissions"))))
-                .list();
+    List<Map<String, Object>> workspaceList(AuthedUser u) {
+        admin(u);
+        return workspaceStore.all().stream().map(workspaceStore::asMap).toList();
     }
 
-    record WorkspaceCreate(@NotBlank @Size(max = 120) String name, @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{1,48}") String slug,
-                           @NotBlank String type, @Size(max = 1000) String description, List<@Email String> managers) {}
+    record WorkspaceCreate(
+            @NotBlank @Size(max = 120) String name,
+            @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{1,48}") String slug,
+            @NotBlank String type,
+            @Size(max = 1000) String description,
+            List<@Email String> managers) {}
 
+    /** Creates a workspace and assigns its initial managers. */
     @PostMapping("/workspaces")
-    @Transactional
-    ResponseEntity<Map<String, Object>> createWorkspace(AuthedUser user, @Valid @RequestBody WorkspaceCreate w) {
-        requireAdmin(user);
-        List<String> perms = db.sql("SELECT default_permissions FROM workspace_types WHERE code = ?").param(w.type())
-                .query((rs, i) -> MeController.textArray(rs.getArray(1))).optional()
-                .orElseThrow(() -> ApiException.unprocessable("unknown_type", "Unknown workspace type \"" + w.type() + "\"."));
-        if (db.sql("SELECT 1 FROM workspaces WHERE slug = ?").param(w.slug()).query(Integer.class).optional().isPresent()) {
-            throw ApiException.conflict("duplicate", "Slug already used.");
-        }
-        LinkedHashSet<String> managers = new LinkedHashSet<>();
-        for (String m : w.managers() == null ? List.<String>of() : w.managers()) {
-            String e = m.toLowerCase(Locale.ROOT);
-            if (!identity.isOrgEmail(e)) throw ApiException.unprocessable("wrong_domain", e + " is not an address of the org domain.");
-            managers.add(e);
-        }
-        UUID id = db.sql("""
-                INSERT INTO workspaces (slug, name, type, description, created_by) VALUES (?, ?, ?, ?, ?) RETURNING id
-                """).params(w.slug(), w.name().trim(), w.type(), w.description() == null ? "" : w.description(), user.email())
-                .query(UUID.class).single();
-        for (String p : perms) {
-            db.sql("INSERT INTO workspace_permissions (workspace_id, permission, granted_by) VALUES (?, ?, ?)").params(id, p, user.email()).update();
-        }
-        for (String m : managers) assignManager(user, id, m);
-        audit.log(user.email(), "workspace.create", id.toString(), id,
-                Map.of("name", w.name(), "slug", w.slug(), "type", w.type(), "managers", List.copyOf(managers), "permissions", perms));
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("id", id);
-        out.put("name", w.name());
-        out.put("slug", w.slug());
-        out.put("type", w.type());
-        out.put("managers", List.copyOf(managers));
-        out.put("permissions", perms);
-        return ResponseEntity.status(HttpStatus.CREATED).body(out);
+    ResponseEntity<Map<String, Object>> create(
+            AuthedUser u, @Valid @RequestBody WorkspaceCreate b) {
+        admin(u);
+        List<String> managers =
+                b.managers() == null || b.managers().isEmpty()
+                        ? List.of(u.email())
+                        : b.managers().stream()
+                                .map(x -> x.toLowerCase(Locale.ROOT))
+                                .distinct()
+                                .toList();
+        String wid =
+                workspaces.create(
+                        u, b.name(), b.slug(), b.type(), b.description(), managers.get(0));
+        for (int i = 1; i < managers.size(); i++) addManagerInternal(u, wid, managers.get(i));
+        return ResponseEntity.status(201)
+                .body(
+                        Map.of(
+                                "id",
+                                wid,
+                                "slug",
+                                b.slug(),
+                                "name",
+                                b.name(),
+                                "type",
+                                b.type(),
+                                "managers",
+                                managers));
     }
 
-    record WorkspacePatch(@Size(min = 1, max = 120) String name, @Size(max = 1000) String description, String type,
-                          @Pattern(regexp = "active|archived") String status) {}
+    record WorkspacePatch(
+            @Size(min = 1, max = 120) String name,
+            @Size(max = 1000) String description,
+            String type,
+            @Pattern(regexp = "active|archived") String status) {}
 
+    /** Updates workspace metadata or active status. */
     @PatchMapping("/workspaces/{id}")
-    @Transactional
-    Map<String, Object> patchWorkspace(AuthedUser user, @PathVariable UUID id, @Valid @RequestBody WorkspacePatch p) {
-        requireAdmin(user);
-        if (db.sql("SELECT 1 FROM workspaces WHERE id = ?").param(id).query(Integer.class).optional().isEmpty()) {
-            throw ApiException.notFound("Workspace not found.");
+    Map<String, Object> patchWorkspace(
+            AuthedUser u, @PathVariable String id, @RequestBody WorkspacePatch b) {
+        admin(u);
+        if (workspaceStore.find(id).isEmpty()) throw ApiException.notFound("Workspace not found.");
+        Map<String, Object> d = new HashMap<>();
+        if (b.name() != null) d.put("name", b.name());
+        if (b.description() != null) d.put("description", b.description());
+        if (b.type() != null) {
+            if (!workspaceStore.types().stream().anyMatch(type -> type.code().equals(b.type())))
+                throw ApiException.unprocessable("unknown_type", "Unknown type.");
+            d.put("type", b.type());
         }
-        if (p.type() != null && db.sql("SELECT 1 FROM workspace_types WHERE code = ?").param(p.type()).query(Integer.class).optional().isEmpty()) {
-            throw ApiException.unprocessable("unknown_type", "Unknown type.");
-        }
-        db.sql("""
-                UPDATE workspaces SET name = COALESCE(?, name), description = COALESCE(?, description),
-                       type = COALESCE(?, type), status = COALESCE(?, status) WHERE id = ?
-                """).params(p.name(), p.description(), p.type(), p.status(), id).update();
-        Map<String, Object> detail = json.convertValue(p, Map.class);
-        detail.values().removeIf(v -> v == null);
-        audit.log(user.email(), "workspace.update", id.toString(), id, detail);
-        detail.put("id", id);
-        return detail;
+        if (b.status() != null) d.put("status", b.status());
+        if (d.isEmpty()) return Map.of("id", id);
+        workspaceStore.updateMetadata(id, b.name(), b.description(), b.type(), b.status());
+        audit.log(u.email(), "workspace.update", id, id, d);
+        d.put("id", id);
+        return d;
     }
 
-    record ManagerBody(@NotNull @Email String email) {}
+    record ManagerBody(@NotBlank @Email String email) {}
 
-    /** Make a domain user manager of a workspace (creates or upgrades the membership). */
+    /** Assigns a workspace manager, promoting members when needed. */
     @PostMapping("/workspaces/{id}/managers")
-    @Transactional
-    ResponseEntity<Map<String, Object>> addManager(AuthedUser user, @PathVariable UUID id, @Valid @RequestBody ManagerBody body) {
-        requireAdmin(user);
-        String email = body.email().toLowerCase(Locale.ROOT);
-        if (!identity.isOrgEmail(email)) throw ApiException.unprocessable("wrong_domain", "Only addresses of the org domain.");
-        if (db.sql("SELECT 1 FROM workspaces WHERE id = ?").param(id).query(Integer.class).optional().isEmpty()) {
-            throw ApiException.notFound("Workspace not found.");
-        }
-        assignManager(user, id, email);
-        audit.log(user.email(), "workspace.manager", email, id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("workspaceId", id, "email", email, "role", "manager"));
+    ResponseEntity<Map<String, Object>> addManager(
+            AuthedUser u, @PathVariable String id, @Valid @RequestBody ManagerBody b) {
+        admin(u);
+        boolean promoted = addManagerInternal(u, id, b.email().toLowerCase(Locale.ROOT));
+        return ResponseEntity.status(201)
+                .body(
+                        Map.of(
+                                "workspaceId",
+                                id,
+                                "email",
+                                b.email().toLowerCase(Locale.ROOT),
+                                "role",
+                                "manager",
+                                "promoted",
+                                promoted));
     }
 
-    private void assignManager(AuthedUser user, UUID workspaceId, String email) {
-        db.sql("INSERT INTO users (email) VALUES (?) ON CONFLICT (email) DO NOTHING").param(email).update();
-        db.sql("""
-                INSERT INTO memberships (workspace_id, user_email, role, status, decided_by, decided_at, decision_note)
-                VALUES (?, ?, 'manager', 'approved', ?, now(), 'assigned by admin')
-                ON CONFLICT (workspace_id, user_email) DO UPDATE SET role = 'manager', status = 'approved',
-                  decided_by = EXCLUDED.decided_by, decided_at = now(), decision_note = EXCLUDED.decision_note
-                """).params(workspaceId, email, user.email()).update();
+    private boolean addManagerInternal(AuthedUser u, String wid, String e) {
+        if (!identity.isOrgEmail(e))
+            throw ApiException.unprocessable("wrong_domain", "Only addresses of the org domain.");
+        if (users.find(e).isEmpty()) identity.refreshFromDirectory(e);
+        return store.transaction(
+                tx -> {
+                    UserStore.User user = users.find(tx, e).orElse(null);
+                    if (user != null && user.disabled())
+                        throw ApiException.conflict("inactive_user", e + " is disabled.");
+                    boolean promoted =
+                            user == null || user.role() == null || "member".equals(user.role());
+                    WorkspaceStore.Workspace workspace =
+                            workspaceStore
+                                    .find(tx, wid)
+                                    .orElseThrow(
+                                            () -> ApiException.notFound("Workspace not found."));
+                    MembershipStore.Membership old =
+                            memberships.find(tx, wid + "_" + e).orElse(null);
+                    if (promoted) {
+                        users.promoteToWorkspaceManager(tx, e);
+                        audit.log(
+                                tx,
+                                u.email(),
+                                "user.role",
+                                e,
+                                null,
+                                Map.of(
+                                        "from",
+                                        "member",
+                                        "to",
+                                        "workspace_manager",
+                                        "reason",
+                                        "assigned_manager"));
+                    }
+                    List<String> managers = new ArrayList<>(workspace.managerEmails());
+                    if (!managers.contains(e)) managers.add(e);
+                    workspaceStore.updateManagerEmails(tx, wid, managers);
+                    Long memberCount =
+                            old == null || !"approved".equals(old.status())
+                                    ? workspace.memberCount() + 1
+                                    : null;
+                    Long pendingCount =
+                            old != null && "pending".equals(old.status())
+                                    ? Math.max(0, workspace.pendingCount() - 1)
+                                    : null;
+                    if (memberCount != null || pendingCount != null)
+                        workspaceStore.updateCounts(tx, wid, memberCount, pendingCount);
+                    memberships.assignManager(tx, wid, e, u.email(), Timestamp.now());
+                    audit.log(
+                            tx,
+                            u.email(),
+                            "workspace.manager",
+                            e,
+                            wid,
+                            Map.of("promoted", promoted));
+                    return promoted;
+                });
     }
 
+    record RequestDecision(
+            @Size(max = 500) String note,
+            String name,
+            String slug,
+            String type,
+            String description) {}
+
+    /** Lists workspace creation requests by status. */
+    @GetMapping("/workspace-requests")
+    List<Map<String, Object>> requests(
+            AuthedUser u, @RequestParam(defaultValue = "pending") String status) {
+        admin(u);
+        return workspaceRequests.byStatus(status).stream()
+                .map(
+                        request -> {
+                            Map<String, Object> d = workspaceRequests.asMap(request);
+                            Map<String, Object> x =
+                                    store.get("users", request.requester()).orElse(Map.of());
+                            d.put("requesterName", x.get("name"));
+                            d.put("department", x.get("department"));
+                            d.put("role", x.get("role"));
+                            return d;
+                        })
+                .toList();
+    }
+
+    /** Approves a request and creates its workspace atomically. */
+    @PostMapping("/workspace-requests/{id}/approve")
+    Map<String, Object> approve(
+            AuthedUser u,
+            @PathVariable String id,
+            @RequestBody(required = false) RequestDecision b) {
+        admin(u);
+        return store.transaction(
+                tx -> {
+                    WorkspaceRequestStore.WorkspaceRequest request =
+                            workspaceRequests
+                                    .find(tx, id)
+                                    .orElseThrow(() -> ApiException.notFound("Request not found."));
+                    if (!"pending".equals(request.status()))
+                        throw ApiException.conflict("not_pending", "Request is not pending.");
+                    String email = request.requester();
+                    UserStore.User user = users.find(tx, email).orElse(null);
+                    if (user != null && user.disabled())
+                        throw ApiException.conflict("inactive_user", "Requester is disabled.");
+                    String name = b != null && b.name() != null ? b.name() : request.name(),
+                            slug = b != null && b.slug() != null ? b.slug() : request.slug(),
+                            type = b != null && b.type() != null ? b.type() : request.type(),
+                            desc =
+                                    b != null && b.description() != null
+                                            ? b.description()
+                                            : request.description();
+                    String wid = workspaces.create(tx, u, name, slug, type, desc, email);
+                    workspaceRequests.decide(
+                            tx,
+                            id,
+                            "approved",
+                            u.email(),
+                            Timestamp.now(),
+                            b == null || b.note() == null ? "" : b.note(),
+                            wid);
+                    users.clearPendingWorkspaceRequest(tx, email);
+                    audit.log(tx, u.email(), "workspace_request.approve", id, wid, Map.of());
+                    return Map.of("requestId", id, "workspaceId", wid, "status", "approved");
+                });
+    }
+
+    /** Rejects a pending workspace creation request. */
+    @PostMapping("/workspace-requests/{id}/reject")
+    Map<String, Object> reject(
+            AuthedUser u,
+            @PathVariable String id,
+            @RequestBody(required = false) RequestDecision b) {
+        admin(u);
+        store.transaction(
+                tx -> {
+                    WorkspaceRequestStore.WorkspaceRequest request =
+                            workspaceRequests
+                                    .find(tx, id)
+                                    .orElseThrow(
+                                            () ->
+                                                    ApiException.conflict(
+                                                            "not_pending",
+                                                            "Request is not pending."));
+                    if (!"pending".equals(request.status()))
+                        throw ApiException.conflict("not_pending", "Request is not pending.");
+                    workspaceRequests.decide(
+                            tx,
+                            id,
+                            "rejected",
+                            u.email(),
+                            Timestamp.now(),
+                            b == null || b.note() == null ? "" : b.note(),
+                            null);
+                    users.clearPendingWorkspaceRequest(tx, request.requester());
+                    audit.log(tx, u.email(), "workspace_request.reject", id, null, Map.of());
+                    return null;
+                });
+        return Map.of("requestId", id, "status", "rejected");
+    }
+
+    /** Lists recent audit events across the module. */
     @GetMapping("/audit")
-    List<WorkspaceController.AuditRow> audit(AuthedUser user, @RequestParam(defaultValue = "200") int limit) {
-        requireAdmin(user);
-        return db.sql("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?").param(Math.max(1, Math.min(limit, 1000)))
-                .query((rs, i) -> WorkspaceController.auditRow(rs, json)).list();
+    List<Map<String, Object>> auditRows(
+            AuthedUser u, @RequestParam(defaultValue = "200") int limit) {
+        admin(u);
+        return store.all("auditLog").stream()
+                .sorted(
+                        Comparator.comparing(
+                                s -> s.getTimestamp("at"),
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(Math.min(limit, 1000))
+                .map(FirestoreStore::data)
+                .toList();
     }
 }

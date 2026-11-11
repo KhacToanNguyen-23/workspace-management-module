@@ -10,6 +10,13 @@ import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+
+import org.hyperdatalab.wbmodule.common.ApiException;
+import org.hyperdatalab.wbmodule.common.AppProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
+
 import java.net.URL;
 import java.time.Instant;
 import java.util.Date;
@@ -17,11 +24,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.hyperdatalab.wbmodule.common.ApiException;
-import org.hyperdatalab.wbmodule.common.AppProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpStatus;
 
 @Configuration
 public class TokenVerifiers {
@@ -34,10 +36,13 @@ public class TokenVerifiers {
     TokenVerifier tokenVerifier(AppProperties props) throws Exception {
         return switch (props.auth().mode()) {
             case "dev" -> new DevTokenVerifier();
-            case "firebase" -> new FirebaseTokenVerifier(
-                    props.auth().firebaseProjectId(),
-                    props.auth().allowedProviders(),
-                    JWKSourceBuilder.create(new URL(FirebaseTokenVerifier.JWKS)).retrying(true).build());
+            case "firebase" ->
+                    new FirebaseTokenVerifier(
+                            props.auth().firebaseProjectId(),
+                            props.auth().allowedProviders(),
+                            JWKSourceBuilder.create(new URL(FirebaseTokenVerifier.JWKS))
+                                    .retrying(true)
+                                    .build());
             default -> throw new IllegalStateException("app.auth.mode must be firebase or dev");
         };
     }
@@ -56,16 +61,20 @@ public class TokenVerifiers {
     }
 
     /**
-     * Single sign-on through the organisation's Google accounts, brokered by Firebase Auth.
-     * The React app obtains an OpenID Connect ID token; this class is the relying-party check:
+     * Single sign-on through the organisation's Google accounts, brokered by Firebase Auth. The
+     * React app obtains an OpenID Connect ID token; this class is the relying-party check:
+     *
      * <ol>
-     *   <li>signature: RS256 against Google's published keys (JWKS, cached and rotated);</li>
-     *   <li>{@code iss} = https://securetoken.google.com/&lt;project&gt; and {@code aud} = &lt;project&gt;;</li>
-     *   <li>{@code exp} in the future, {@code iat} / {@code auth_time} not in the future (60 s skew);</li>
-     *   <li>{@code sub} present, {@code email} present and {@code email_verified} = true;</li>
+     *   <li>signature: RS256 against Google's published keys (JWKS, cached and rotated);
+     *   <li>{@code iss} = https://securetoken.google.com/&lt;project&gt; and {@code aud} =
+     *       &lt;project&gt;;
+     *   <li>{@code exp} in the future, {@code iat} / {@code auth_time} not in the future (60 s
+     *       skew);
+     *   <li>{@code sub} present, {@code email} present and {@code email_verified} = true;
      *   <li>{@code firebase.sign_in_provider} is an allowed identity provider (google.com), so a
-     *       password or anonymous Firebase account can never pass as an SSO login.</li>
+     *       password or anonymous Firebase account can never pass as an SSO login.
      * </ol>
+     *
      * The org-domain and directory checks happen afterwards in IdentityService.
      */
     public static final class FirebaseTokenVerifier implements TokenVerifier {
@@ -76,14 +85,19 @@ public class TokenVerifiers {
         private final DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
         private final Set<String> allowedProviders;
 
-        public FirebaseTokenVerifier(String projectId, List<String> allowedProviders, JWKSource<SecurityContext> keys) {
+        public FirebaseTokenVerifier(
+                String projectId, List<String> allowedProviders, JWKSource<SecurityContext> keys) {
             this.allowedProviders = Set.copyOf(allowedProviders);
-            processor.setJWSTypeVerifier(new DefaultJOSEObjectTypeVerifier<>(JOSEObjectType.JWT, null));
+            processor.setJWSTypeVerifier(
+                    new DefaultJOSEObjectTypeVerifier<>(JOSEObjectType.JWT, null));
             processor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, keys));
-            DefaultJWTClaimsVerifier<SecurityContext> claims = new DefaultJWTClaimsVerifier<>(
-                    projectId,
-                    new JWTClaimsSet.Builder().issuer("https://securetoken.google.com/" + projectId).build(),
-                    Set.of("sub", "iat", "exp", "auth_time", "email"));
+            DefaultJWTClaimsVerifier<SecurityContext> claims =
+                    new DefaultJWTClaimsVerifier<>(
+                            projectId,
+                            new JWTClaimsSet.Builder()
+                                    .issuer("https://securetoken.google.com/" + projectId)
+                                    .build(),
+                            Set.of("sub", "iat", "exp", "auth_time", "email"));
             claims.setMaxClockSkew((int) SKEW_SECONDS);
             processor.setJWTClaimsSetVerifier(claims);
         }
@@ -100,8 +114,10 @@ public class TokenVerifiers {
                 Instant limit = Instant.now().plusSeconds(SKEW_SECONDS);
                 Date iat = claims.getIssueTime();
                 Date authTime = claims.getDateClaim("auth_time");
-                if (claims.getSubject() == null || claims.getSubject().isBlank()
-                        || iat.toInstant().isAfter(limit) || authTime.toInstant().isAfter(limit)) {
+                if (claims.getSubject() == null
+                        || claims.getSubject().isBlank()
+                        || iat.toInstant().isAfter(limit)
+                        || authTime.toInstant().isAfter(limit)) {
                     throw unauthorized("invalid_token", "Malformed token claims.");
                 }
                 if (!Boolean.TRUE.equals(claims.getBooleanClaim("email_verified"))) {
@@ -110,7 +126,9 @@ public class TokenVerifiers {
                 Map<String, Object> firebase = claims.getJSONObjectClaim("firebase");
                 Object provider = firebase == null ? null : firebase.get("sign_in_provider");
                 if (!(provider instanceof String p) || !allowedProviders.contains(p)) {
-                    throw unauthorized("provider_not_allowed", "Sign in with your organisation's Google account.");
+                    throw unauthorized(
+                            "provider_not_allowed",
+                            "Sign in with your organisation's Google account.");
                 }
                 String name = claims.getStringClaim("name");
                 return new TokenIdentity(
