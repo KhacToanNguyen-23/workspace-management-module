@@ -13,15 +13,17 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+
+import org.hyperdatalab.wbmodule.auth.TokenVerifiers.FirebaseTokenVerifier;
+import org.hyperdatalab.wbmodule.common.ApiException;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import org.hyperdatalab.wbmodule.auth.TokenVerifiers.FirebaseTokenVerifier;
-import org.hyperdatalab.wbmodule.common.ApiException;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 
 /** Relying-party checks of the SSO ID token, using tokens signed with a throwaway RSA key. */
 class FirebaseTokenVerifierTest {
@@ -34,25 +36,36 @@ class FirebaseTokenVerifierTest {
     static void keys() throws Exception {
         key = new RSAKeyGenerator(2048).keyID("k1").generate();
         otherKey = new RSAKeyGenerator(2048).keyID("k1").generate();
-        verifier = new FirebaseTokenVerifier(PROJECT, List.of("google.com"), new ImmutableJWKSet<>(new JWKSet(key.toPublicJWK())));
+        verifier =
+                new FirebaseTokenVerifier(
+                        PROJECT,
+                        List.of("google.com"),
+                        new ImmutableJWKSet<>(new JWKSet(key.toPublicJWK())));
     }
 
     static String token(RSAKey signer, Consumer<JWTClaimsSet.Builder> change) throws Exception {
         Instant now = Instant.now();
-        JWTClaimsSet.Builder b = new JWTClaimsSet.Builder()
-                .issuer("https://securetoken.google.com/" + PROJECT)
-                .audience(PROJECT)
-                .subject("uid-123")
-                .issueTime(Date.from(now.minusSeconds(10)))
-                .expirationTime(Date.from(now.plusSeconds(3600)))
-                .claim("auth_time", now.minusSeconds(30).getEpochSecond())
-                .claim("email", "Alice@HyperDataLab.org")
-                .claim("email_verified", true)
-                .claim("name", "Alice Nguyen")
-                .claim("picture", "https://example.org/a.png")
-                .claim("firebase", Map.of("sign_in_provider", "google.com"));
+        JWTClaimsSet.Builder b =
+                new JWTClaimsSet.Builder()
+                        .issuer("https://securetoken.google.com/" + PROJECT)
+                        .audience(PROJECT)
+                        .subject("uid-123")
+                        .issueTime(Date.from(now.minusSeconds(10)))
+                        .expirationTime(Date.from(now.plusSeconds(3600)))
+                        .claim("auth_time", now.minusSeconds(30).getEpochSecond())
+                        .claim("email", "Alice@HyperDataLab.org")
+                        .claim("email_verified", true)
+                        .claim("name", "Alice Nguyen")
+                        .claim("picture", "https://example.org/a.png")
+                        .claim("firebase", Map.of("sign_in_provider", "google.com"));
         change.accept(b);
-        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).type(JOSEObjectType.JWT).keyID("k1").build(), b.build());
+        SignedJWT jwt =
+                new SignedJWT(
+                        new JWSHeader.Builder(JWSAlgorithm.RS256)
+                                .type(JOSEObjectType.JWT)
+                                .keyID("k1")
+                                .build(),
+                        b.build());
         jwt.sign(new RSASSASigner(signer));
         return jwt.serialize();
     }
@@ -84,16 +97,28 @@ class FirebaseTokenVerifierTest {
     @Test
     void rejectsATokenForAnotherProject() throws Exception {
         assertThat(codeOf(token(key, b -> b.audience("someone-else")))).isEqualTo("invalid_token");
-        assertThat(codeOf(token(key, b -> b.issuer("https://securetoken.google.com/someone-else")))).isEqualTo("invalid_token");
-        assertThat(codeOf(token(key, b -> b.issuer("https://accounts.evil.example")))).isEqualTo("invalid_token");
+        assertThat(codeOf(token(key, b -> b.issuer("https://securetoken.google.com/someone-else"))))
+                .isEqualTo("invalid_token");
+        assertThat(codeOf(token(key, b -> b.issuer("https://accounts.evil.example"))))
+                .isEqualTo("invalid_token");
     }
 
     @Test
     void rejectsExpiredAndFutureTokens() throws Exception {
         Instant now = Instant.now();
-        assertThat(codeOf(token(key, b -> b.expirationTime(Date.from(now.minusSeconds(300)))))).isEqualTo("invalid_token");
-        assertThat(codeOf(token(key, b -> b.issueTime(Date.from(now.plusSeconds(600)))))).isEqualTo("invalid_token");
-        assertThat(codeOf(token(key, b -> b.claim("auth_time", now.plusSeconds(600).getEpochSecond())))).isEqualTo("invalid_token");
+        assertThat(codeOf(token(key, b -> b.expirationTime(Date.from(now.minusSeconds(300))))))
+                .isEqualTo("invalid_token");
+        assertThat(codeOf(token(key, b -> b.issueTime(Date.from(now.plusSeconds(600))))))
+                .isEqualTo("invalid_token");
+        assertThat(
+                        codeOf(
+                                token(
+                                        key,
+                                        b ->
+                                                b.claim(
+                                                        "auth_time",
+                                                        now.plusSeconds(600).getEpochSecond()))))
+                .isEqualTo("invalid_token");
     }
 
     @Test
@@ -105,15 +130,34 @@ class FirebaseTokenVerifierTest {
 
     @Test
     void rejectsUnverifiedEmails() throws Exception {
-        assertThat(codeOf(token(key, b -> b.claim("email_verified", false)))).isEqualTo("unverified");
-        assertThat(codeOf(token(key, b -> b.claim("email_verified", null)))).isEqualTo("unverified");
+        assertThat(codeOf(token(key, b -> b.claim("email_verified", false))))
+                .isEqualTo("unverified");
+        assertThat(codeOf(token(key, b -> b.claim("email_verified", null))))
+                .isEqualTo("unverified");
     }
 
     @Test
     void rejectsNonSsoSignInProviders() throws Exception {
-        assertThat(codeOf(token(key, b -> b.claim("firebase", Map.of("sign_in_provider", "password"))))).isEqualTo("provider_not_allowed");
-        assertThat(codeOf(token(key, b -> b.claim("firebase", Map.of("sign_in_provider", "anonymous"))))).isEqualTo("provider_not_allowed");
-        assertThat(codeOf(token(key, b -> b.claim("firebase", null)))).isEqualTo("provider_not_allowed");
+        assertThat(
+                        codeOf(
+                                token(
+                                        key,
+                                        b ->
+                                                b.claim(
+                                                        "firebase",
+                                                        Map.of("sign_in_provider", "password")))))
+                .isEqualTo("provider_not_allowed");
+        assertThat(
+                        codeOf(
+                                token(
+                                        key,
+                                        b ->
+                                                b.claim(
+                                                        "firebase",
+                                                        Map.of("sign_in_provider", "anonymous")))))
+                .isEqualTo("provider_not_allowed");
+        assertThat(codeOf(token(key, b -> b.claim("firebase", null))))
+                .isEqualTo("provider_not_allowed");
     }
 
     @Test
