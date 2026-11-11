@@ -2,6 +2,7 @@ package org.hyperdatalab.wbmodule.directory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -24,14 +25,16 @@ import java.util.Optional;
  * </pre>
  */
 public class HttpUserDirectory implements UserDirectory {
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient http =
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final ObjectMapper json;
     private final String baseUrl;
     private final String token;
     private final String domain;
 
     public HttpUserDirectory(ObjectMapper json, String baseUrl, String token, String domain) {
-        if (baseUrl == null || baseUrl.isBlank()) throw new IllegalStateException("app.directory.http-base-url is required");
+        if (baseUrl == null || baseUrl.isBlank())
+            throw new IllegalStateException("app.directory.http-base-url is required");
         this.json = json;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
         this.token = token;
@@ -44,8 +47,11 @@ public class HttpUserDirectory implements UserDirectory {
     }
 
     private HttpResponse<String> get(String url) {
-        HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15)).GET()
-                .header("accept", "application/json");
+        HttpRequest.Builder req =
+                HttpRequest.newBuilder(URI.create(url))
+                        .timeout(Duration.ofSeconds(15))
+                        .GET()
+                        .header("accept", "application/json");
         if (token != null && !token.isBlank()) req.header("authorization", "Bearer " + token);
         try {
             return http.send(req.build(), HttpResponse.BodyHandlers.ofString());
@@ -65,9 +71,11 @@ public class HttpUserDirectory implements UserDirectory {
 
     @Override
     public Optional<DirectoryUser> find(String email) {
-        HttpResponse<String> res = get(baseUrl + "/users/" + URLEncoder.encode(email, StandardCharsets.UTF_8));
+        HttpResponse<String> res =
+                get(baseUrl + "/users/" + URLEncoder.encode(email, StandardCharsets.UTF_8));
         if (res.statusCode() == 404) return Optional.empty();
-        if (res.statusCode() >= 300) throw new DirectoryException("User directory answered HTTP " + res.statusCode() + ".");
+        if (res.statusCode() >= 300)
+            throw new DirectoryException("User directory answered HTTP " + res.statusCode() + ".");
         try {
             return Optional.of(map(json.readTree(res.body())));
         } catch (Exception e) {
@@ -77,8 +85,10 @@ public class HttpUserDirectory implements UserDirectory {
 
     @Override
     public List<DirectoryUser> listAll() {
-        HttpResponse<String> res = get(baseUrl + "/users?domain=" + URLEncoder.encode(domain, StandardCharsets.UTF_8));
-        if (res.statusCode() >= 300) throw new DirectoryException("User directory answered HTTP " + res.statusCode() + ".");
+        HttpResponse<String> res =
+                get(baseUrl + "/users?domain=" + URLEncoder.encode(domain, StandardCharsets.UTF_8));
+        if (res.statusCode() >= 300)
+            throw new DirectoryException("User directory answered HTTP " + res.statusCode() + ".");
         try {
             JsonNode root = json.readTree(res.body());
             JsonNode arr = root.isArray() ? root : root.path("users");

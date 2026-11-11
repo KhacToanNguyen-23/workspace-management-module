@@ -4,11 +4,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Source of truth for who is registered under the org domain (@hyperdatalab.org).
- * Implementations call an external service; the app's own workspaces are unrelated to it.
+ * Source of truth for who is registered under the org domain (@hyperdatalab.org). Implementations
+ * call an external service; the app's own workspaces are unrelated to it.
  */
 public interface UserDirectory {
-    record DirectoryUser(String email, String name, String photoUrl, String department, boolean suspended) {}
+    record DirectoryUser(
+            String email, String name, String photoUrl, String department, boolean suspended) {}
 
     String mode();
 

@@ -12,10 +12,22 @@ export function ErrorBox({ error }: { error: unknown }) {
 }
 
 export function Badge({ value }: { value: string }) {
-  return <span className={`badge badge-${value}`}>{STATUS_LABEL[value] ?? value}</span>;
+  return (
+    <span className={`badge badge-${value}`}>
+      {STATUS_LABEL[value] ?? value}
+    </span>
+  );
 }
 
-export function PageHeader({ title, sub, actions }: { title: string; sub?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({
+  title,
+  sub,
+  actions,
+}: {
+  title: string;
+  sub?: ReactNode;
+  actions?: ReactNode;
+}) {
   return (
     <header className="page-header">
       <div>
@@ -46,4 +58,5 @@ export function useAction() {
   return { busy, error, run, setError };
 }
 
-export const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString("vi-VN") : "—");
+export const fmtDate = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleString("vi-VN") : "—";

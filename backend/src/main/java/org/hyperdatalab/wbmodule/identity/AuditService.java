@@ -1,36 +1,52 @@
 package org.hyperdatalab.wbmodule.identity;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Map;
-import java.util.UUID;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.google.cloud.Timestamp;
+import com.google.cloud.firestore.Transaction;
+
+import org.hyperdatalab.wbmodule.store.FirestoreStore;
 import org.springframework.stereotype.Service;
 
-/** Append-only audit trail. Call it inside the same transaction as the change it records. */
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Service
 public class AuditService {
-    private final JdbcClient db;
-    private final ObjectMapper json;
+    private final FirestoreStore store;
 
-    public AuditService(JdbcClient db, ObjectMapper json) {
-        this.db = db;
-        this.json = json;
+    public AuditService(FirestoreStore store) {
+        this.store = store;
     }
 
-    public void log(String actor, String action, String target, UUID workspaceId, Map<String, ?> detail) {
-        String detailJson;
-        try {
-            detailJson = json.writeValueAsString(detail == null ? Map.of() : detail);
-        } catch (JsonProcessingException e) {
-            detailJson = "{}";
-        }
-        db.sql("INSERT INTO audit_log (actor, action, target, workspace_id, detail) VALUES (?, ?, ?, ?, ?::jsonb)")
-                .params(actor, action, target == null ? "" : target, workspaceId, detailJson)
-                .update();
+    public void log(
+            String actor,
+            String action,
+            String target,
+            String workspaceId,
+            Map<String, Object> detail) {
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("at", Timestamp.now());
+        d.put("actor", actor);
+        d.put("action", action);
+        d.put("target", target == null ? "" : target);
+        d.put("workspaceId", workspaceId);
+        d.put("detail", detail == null ? Map.of() : detail);
+        store.firestore().collection("auditLog").add(d);
     }
 
-    public void log(String actor, String action, String target, UUID workspaceId) {
-        log(actor, action, target, workspaceId, Map.of());
+    public void log(
+            Transaction tx,
+            String actor,
+            String action,
+            String target,
+            String workspaceId,
+            Map<String, Object> detail) {
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("at", Timestamp.now());
+        d.put("actor", actor);
+        d.put("action", action);
+        d.put("target", target == null ? "" : target);
+        d.put("workspaceId", workspaceId);
+        d.put("detail", detail == null ? Map.of() : detail);
+        tx.create(store.firestore().collection("auditLog").document(), d);
     }
 }

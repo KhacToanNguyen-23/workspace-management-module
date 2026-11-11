@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    { "collectionGroup": "memberships", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "workspaceId", "order": "ASCENDING" }, { "fieldPath": "requestedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "memberships", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "workspaceId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "requestedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "workspaces", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "name", "order": "ASCENDING" }] },
+    { "collectionGroup": "workspaceRequests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "requester", "order": "ASCENDING" }, { "fieldPath": "requestedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "workspaceRequests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "requestedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "downloadRequests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "workspaceId", "order": "ASCENDING" }, { "fieldPath": "requestedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "downloadRequests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "workspaceId", "order": "ASCENDING" }, { "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "requestedAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "downloadRequests", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "workspaceId", "order": "ASCENDING" }, { "fieldPath": "requester", "order": "ASCENDING" }] },
+    { "collectionGroup": "auditLog", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "workspaceId", "order": "ASCENDING" }, { "fieldPath": "at", "order": "DESCENDING" }] }
+  ],
+  "fieldOverrides": []
+}

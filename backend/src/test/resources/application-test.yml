@@ -1,4 +1,8 @@
 app:
+  firestore:
+    project-id: wb-module-test
+    emulator-host: ${FIRESTORE_EMULATOR_HOST:localhost:8085}
+    credentials-file: ''
   auth:
     mode: dev
   directory:
@@ -10,6 +14,3 @@ app:
       - { email: bob@hyperdatalab.org, name: Bob Tran, department: /review, suspended: false }
       - { email: gone@hyperdatalab.org, name: Former, suspended: true }
 
-spring:
-  datasource:
-    url: ${TEST_DB_URL:jdbc:postgresql://localhost:5433/wb_module_test}

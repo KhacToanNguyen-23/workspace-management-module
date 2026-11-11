@@ -1,116 +1,102 @@
-# Writing Bank — Module Member, Workspace & Quyền
+# Writing Bank — Module thành viên và workspace
 
-Module độc lập, viết để test riêng rồi ghép vào repo Writing Bank.
+Module độc lập để phát triển và kiểm thử trước khi ghép vào Writing Bank.
 
-- **Backend:** Java 17 + Spring Boot 3 (`backend/`)
-- **Database:** PostgreSQL 16, schema quản lý bằng Flyway
-- **Frontend:** React + react-router + Vite (`web/`)
+- **Backend:** Java 17 + Spring Boot 3, Firebase Admin SDK.
+- **Database:** Cloud Firestore; local và integration test dùng Firestore emulator.
+- **Frontend:** React + React Router + Vite.
 
-Phạm vi hiện tại: **lấy thông tin member, workspace và quản lý quyền**. Phần corpus, fetcher, downloader, extractor chưa làm.
+Web chỉ gọi Java API. Backend là thành phần duy nhất đọc và ghi Firestore; [firestore.rules](firestore.rules) chặn truy cập trực tiếp từ client.
 
 ## Module làm gì
 
 | Phần | Nội dung |
 |---|---|
-| **Member** | Chỉ tài khoản Google `@hyperdatalab.org` đăng nhập được. Khi đăng nhập, backend gọi **API của bên khác** (user directory) để kiểm tra người đó có đăng ký dưới tên miền và còn active không, rồi lấy tên, phòng ban, ảnh và liên kết với user trong hệ thống. Có đồng bộ toàn bộ danh bạ hằng đêm (02:00) và nút đồng bộ cho admin. |
-| **Workspace** | Workspace là **không gian làm việc riêng của web** (một nhóm trong Writing Bank), không phải Google Workspace. Admin tạo workspace, chọn **loại** (research / review / readonly, thêm được loại mới) và gán manager. |
-| **Vào workspace** | User chưa thuộc workspace nào sẽ bị đưa vào màn chọn workspace để **gửi yêu cầu**. **Manager** của workspace đó duyệt hoặc từ chối. Manager cũng có thể thu hồi, đổi vai trò, hoặc thêm thẳng một member. |
-| **Quyền** | Vai trò trong workspace: viewer < member < manager. Manager **bật/tắt quyền của workspace**. Quyền thực tế của một người = quyền của vai trò ∩ quyền workspace đang bật. Chỉ admin gán hoặc gỡ manager. |
-| **Admin** | `admin@hyperdatalab.org` luôn là admin: xem toàn bộ member, khoá/mở khoá, nâng người khác làm admin, tạo/lưu trữ workspace, xem nhật ký. Mọi thay đổi đều ghi audit log. |
+| **Member** | Tài khoản `@hyperdatalab.org` đăng nhập qua Google. Backend kiểm tra user directory, lấy tên, phòng ban và ảnh; đồng bộ danh bạ hằng đêm và theo yêu cầu admin. |
+| **Workspace** | Workspace là không gian làm việc trong Writing Bank, có loại `research`, `review` hoặc `readonly`. Manager duyệt yêu cầu tham gia, thêm hoặc thu hồi member và xử lý yêu cầu download paper. |
+| **Yêu cầu workspace** | Member gửi yêu cầu tạo workspace. Admin duyệt để nâng requester thành `workspace_manager` và tạo workspace trong cùng transaction. |
+| **Yêu cầu download** | Member đã được duyệt gửi DOI, URL hoặc tiêu đề paper. Manager duyệt hoặc từ chối; hệ thống không tải paper và không tạo link. |
+| **Admin** | Quản lý role và trạng thái user, duyệt yêu cầu tạo workspace, quản lý workspace và xem audit log. |
 
-### Bảng quyền
+### Ba role toàn cục
 
-| Mã quyền | Ý nghĩa | viewer | member | manager |
-|---|---|---|---|---|
-| `workspace.read` | Xem nội dung | ✓ | ✓ | ✓ |
-| `workspace.write` | Tạo / sửa nội dung | | ✓ | ✓ |
-| `workspace.review` | Duyệt nội dung | | ✓ | ✓ |
-| `members.manage` | Duyệt yêu cầu, quản lý thành viên, bật/tắt quyền | | | ✓ |
+| Role | Quyền |
+|---|---|
+| `admin` | Quản lý user và mọi workspace, duyệt yêu cầu tạo workspace, xem audit log. `admin@hyperdatalab.org` luôn được bảo vệ. |
+| `workspace_manager` | Tạo workspace, quản lý workspace mình tham gia với role `manager`, duyệt yêu cầu tham gia và download. |
+| `member` | Xin vào workspace, xin tạo workspace và gửi yêu cầu download khi đã là member được duyệt. |
 
-Ba quyền `workspace.*` chỉ có hiệu lực khi manager bật cho workspace. `members.manage` không bị tắt được, để manager luôn bật lại được quyền.
+Role trong workspace chỉ là `manager` hoặc `member`. Admin có quyền quản lý mọi workspace. Workspace manager duy nhất của workspace đang hoạt động không thể bị hạ role; cần gán thêm manager trước.
 
 ## Chạy local
 
-Cần Java 17, Maven, Node 20+, Docker.
+Cần Java 17, Maven, Node 20+ và Docker.
 
 ```bash
 npm install
-npm run db:up          # PostgreSQL ở cổng 5433
-npm run dev:backend    # http://localhost:8080 (Flyway tự tạo bảng)
+npm run db:up          # Firestore emulator tại localhost:8085
+npm run dev:backend    # http://localhost:8080
 npm run dev:web        # http://localhost:5174
 ```
 
-Mặc định local chạy `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`: màn đăng nhập là ô nhập email, và mọi địa chỉ `@hyperdatalab.org` đều được coi là active.
+Local mặc định dùng `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`. Đăng nhập bằng email trong `backend/src/test/resources/application-test.yml` hoặc địa chỉ org bất kỳ khi mock user list rỗng.
 
-Kịch bản thử:
-1. Đăng nhập `admin@hyperdatalab.org` → **Quản trị** → tạo workspace, gán manager (ví dụ `mai@hyperdatalab.org`).
-2. Đăng nhập `alice@hyperdatalab.org` → bị đưa vào **Tham gia workspace** → gửi yêu cầu.
-3. Đăng nhập `mai@...` → **Thành viên & quyền** → duyệt alice, thử bật/tắt quyền.
-4. Đăng nhập lại alice → trang **Tổng quan** hiện quyền của alice và danh sách thành viên.
+## Kịch bản thử
 
-## Test
+1. `alice@hyperdatalab.org` đăng nhập với role `member` và gửi **Xin tạo workspace**.
+2. `admin@hyperdatalab.org` mở **Quản trị → Yêu cầu tạo workspace** và duyệt. Alice thành `workspace_manager` và workspace được tạo.
+3. `bob@hyperdatalab.org` gửi yêu cầu tham gia workspace của Alice; Alice duyệt trong **Quản lý workspace**.
+4. Bob gửi yêu cầu download paper ở trang workspace; Alice xem và duyệt trong **Yêu cầu download**.
+5. Admin vô hiệu hoá Bob; request đăng nhập tiếp theo của Bob bị từ chối với `403 disabled`.
+
+## Test và kiểm tra frontend
+
+Integration test dùng Firestore emulator trong Docker Compose. Dữ liệu các collection nghiệp vụ được xoá trước mỗi test; workspace types được seed lại idempotent lúc ứng dụng khởi động.
+Backend test suite hiện có 38 test, gồm kiểm thử API trên emulator và unit test.
 
 ```bash
-docker compose exec -T postgres psql -U wb -d wb_module -c "CREATE DATABASE wb_module_test"   # chạy một lần
+npm run db:up
 npm test
+npm run typecheck
+npm run build
 ```
 
-43 test: 29 test API chạy trên PostgreSQL thật (database `wb_module_test`), 9 test kiểm tra token SSO, 5 unit test (mô hình quyền, client gọi user directory qua HTTP).
+## Cấu trúc mã nguồn
 
-## Cấu hình (biến môi trường)
+```text
+backend/src/main/java/org/hyperdatalab/wbmodule/
+  auth/        Xác thực Firebase/dev token và filter
+  config/      Cấu hình Firestore
+  directory/   Adapter user directory (HTTP, Google, mock)
+  identity/    IdentityService và audit log
+  store/       Truy cập collection Firestore và seeder
+  workspace/   API role, workspace, membership và request
+web/src/
+  app/         Router, layout và context
+  features/    Màn hình auth, admin và workspace
+  shared/      Component, API client và kiểu dùng chung
+```
+
+## Cấu hình chính
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
-| `DB_URL`, `DB_USER`, `DB_PASSWORD` | Postgres local cổng 5433 | Kết nối PostgreSQL |
-| `AUTH_MODE` | `dev` | `firebase` ở production: verify Firebase ID token của project `hyperdatalab-writing-bank` |
-| `DIRECTORY_MODE` | `mock` | Nguồn thông tin member: `http`, `google`, `mock`, `off` |
-| `DIRECTORY_HTTP_BASE_URL`, `DIRECTORY_HTTP_TOKEN` | | Dùng với `http` |
-| `GOOGLE_SA_FILE` | | Dùng với `google`: đường dẫn file JSON của service account |
-| `CORS_ORIGIN` | `http://localhost:5174` | Origin của web |
+| `FIRESTORE_PROJECT_ID` | `hyperdatalab-writing-bank` | Project ID cho Firestore. |
+| `FIRESTORE_EMULATOR_HOST` | rỗng | Đặt `localhost:8085` để dùng emulator; để trống khi chạy production. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | rỗng | Service account JSON cho production; nếu rỗng backend dùng ADC. |
+| `AUTH_MODE` | `dev` | Dùng `firebase` khi chạy production. |
+| `DIRECTORY_MODE` | `mock` | Nguồn user directory: `http`, `google`, `mock` hoặc `off`. |
+| `DIRECTORY_HTTP_BASE_URL`, `DIRECTORY_HTTP_TOKEN` | rỗng | Cấu hình adapter HTTP. |
+| `GOOGLE_SA_FILE` | rỗng | Service account cho adapter Google Directory. |
+| `CORS_ORIGIN` | `http://localhost:5174` | Origin của web. |
 
-Phía web (`web/.env.local`): `VITE_AUTH_MODE=firebase` và các biến `VITE_FIREBASE_*`.
+Firebase Admin SDK dùng phiên bản 9.11.0. Production cần cấu hình credentials và triển khai các composite index trong [firestore.indexes.json](firestore.indexes.json).
 
-### Nguồn thông tin member (`DIRECTORY_MODE`)
+## User directory
 
-- **`http`** — một REST API bất kỳ biết danh sách user của tên miền:
-  - `GET {baseUrl}/users/{email}` → `200 {email, name, photoUrl, department, suspended}` hoặc `404`
-  - `GET {baseUrl}/users?domain=hyperdatalab.org` → mảng các object như trên (hoặc `{"users": [...]}`)
-  - Gửi kèm `Authorization: Bearer {token}` nếu có cấu hình token.
-- **`google`** — Google Admin SDK Directory API, qua service account có domain-wide delegation với scope `admin.directory.user.readonly`, chạy dưới danh nghĩa `admin@hyperdatalab.org`. Chỉ đọc danh sách tài khoản của tên miền.
-- **`mock`** — danh sách trong `app.directory.mock-users` (xem `backend/src/test/resources/application-test.yml`).
+- **`http`** — `GET {baseUrl}/users/{email}` và `GET {baseUrl}/users?domain=hyperdatalab.org`; có thể gửi `Authorization: Bearer {token}`.
+- **`google`** — Google Admin SDK Directory API qua service account có domain-wide delegation với scope `admin.directory.user.readonly`.
+- **`mock`** — danh sách `app.directory.mock-users` trong `application-test.yml`.
+- **`off`** — tắt kiểm tra directory.
 
-Muốn nối API khác: implement interface `UserDirectory` (2 hàm `find`, `listAll`) và đăng ký trong `DirectoryConfig`.
-
-Xem [docs/INTEGRATION.md](docs/INTEGRATION.md) để biết danh sách API và cách ghép vào repo Writing Bank.
-
-## Đăng nhập SSO (Firebase + Google của tổ chức)
-
-Đăng nhập một lần theo chuẩn OpenID Connect: Google là nhà cung cấp danh tính, Firebase Auth làm trung gian, backend Java là bên tin cậy (relying party).
-
-**Luồng:**
-1. Web mở trang đăng nhập Google với `hd=hyperdatalab.org` (popup; nếu trình duyệt chặn popup thì tự chuyển sang redirect cả trang).
-2. Firebase trả về ID token (JWT ký RS256, hạn 1 giờ) và tự gia hạn trước khi hết hạn. Người đã đăng nhập quay lại không phải đăng nhập lại.
-3. Mỗi request gửi `Authorization: Bearer <ID token>`.
-4. Backend kiểm tra token rồi mới kiểm tra tên miền, danh sách member của lab và trạng thái khoá.
-5. Sau khi đăng nhập, web đưa người dùng về đúng trang họ định vào.
-
-**Backend kiểm tra token** (`TokenVerifiers.FirebaseTokenVerifier`):
-
-| Kiểm tra | Chi tiết |
-|---|---|
-| Chữ ký | RS256, khoá công khai của Google (JWKS, có cache và tự đổi khoá) |
-| `iss`, `aud` | Phải đúng project Firebase của Writing Bank |
-| `exp`, `iat`, `auth_time` | Chưa hết hạn, không ở tương lai (lệch đồng hồ tối đa 60 giây) |
-| `sub`, `email`, `email_verified` | Bắt buộc có, email phải đã xác minh |
-| `firebase.sign_in_provider` | Phải là `google.com`; tài khoản mật khẩu hoặc ẩn danh của Firebase bị từ chối |
-
-Token sai trả `401` kèm header `WWW-Authenticate: Bearer ...` (RFC 6750). Khi nhận 401, web xin token mới một lần; nếu vẫn 401 thì đăng xuất và đưa về trang đăng nhập.
-
-**Thu hồi quyền:** backend kiểm tra trạng thái member ở mỗi request, nên khoá một tài khoản có hiệu lực ngay, không phải chờ token hết hạn.
-
-**Đăng xuất:** kết thúc phiên của ứng dụng trên thiết bị đó; không đăng xuất tài khoản Google của người dùng.
-
-**Bật SSO thật:**
-1. Backend: `AUTH_MODE=firebase`.
-2. Web: trong `web/.env.local` đặt `VITE_AUTH_MODE=firebase` và điền `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` (lấy ở Firebase console → Project settings → Your apps).
-3. Firebase console → Authentication → Sign-in method: bật Google. Ở Settings → Authorized domains: thêm tên miền chạy web.
+Xem [docs/INTEGRATION.md](docs/INTEGRATION.md) để biết API và hướng dẫn tích hợp.
