@@ -55,7 +55,7 @@ docker compose exec -T postgres psql -U wb -d wb_module -c "CREATE DATABASE wb_m
 npm test
 ```
 
-33 test: 28 test API chạy trên PostgreSQL thật (database `wb_module_test`), 5 unit test (mô hình quyền, client gọi user directory qua HTTP).
+43 test: 29 test API chạy trên PostgreSQL thật (database `wb_module_test`), 9 test kiểm tra token SSO, 5 unit test (mô hình quyền, client gọi user directory qua HTTP).
 
 ## Cấu hình (biến môi trường)
 
@@ -82,3 +82,35 @@ Phía web (`web/.env.local`): `VITE_AUTH_MODE=firebase` và các biến `VITE_FI
 Muốn nối API khác: implement interface `UserDirectory` (2 hàm `find`, `listAll`) và đăng ký trong `DirectoryConfig`.
 
 Xem [docs/INTEGRATION.md](docs/INTEGRATION.md) để biết danh sách API và cách ghép vào repo Writing Bank.
+
+## Đăng nhập SSO (Firebase + Google của tổ chức)
+
+Đăng nhập một lần theo chuẩn OpenID Connect: Google là nhà cung cấp danh tính, Firebase Auth làm trung gian, backend Java là bên tin cậy (relying party).
+
+**Luồng:**
+1. Web mở trang đăng nhập Google với `hd=hyperdatalab.org` (popup; nếu trình duyệt chặn popup thì tự chuyển sang redirect cả trang).
+2. Firebase trả về ID token (JWT ký RS256, hạn 1 giờ) và tự gia hạn trước khi hết hạn. Người đã đăng nhập quay lại không phải đăng nhập lại.
+3. Mỗi request gửi `Authorization: Bearer <ID token>`.
+4. Backend kiểm tra token rồi mới kiểm tra tên miền, danh sách member của lab và trạng thái khoá.
+5. Sau khi đăng nhập, web đưa người dùng về đúng trang họ định vào.
+
+**Backend kiểm tra token** (`TokenVerifiers.FirebaseTokenVerifier`):
+
+| Kiểm tra | Chi tiết |
+|---|---|
+| Chữ ký | RS256, khoá công khai của Google (JWKS, có cache và tự đổi khoá) |
+| `iss`, `aud` | Phải đúng project Firebase của Writing Bank |
+| `exp`, `iat`, `auth_time` | Chưa hết hạn, không ở tương lai (lệch đồng hồ tối đa 60 giây) |
+| `sub`, `email`, `email_verified` | Bắt buộc có, email phải đã xác minh |
+| `firebase.sign_in_provider` | Phải là `google.com`; tài khoản mật khẩu hoặc ẩn danh của Firebase bị từ chối |
+
+Token sai trả `401` kèm header `WWW-Authenticate: Bearer ...` (RFC 6750). Khi nhận 401, web xin token mới một lần; nếu vẫn 401 thì đăng xuất và đưa về trang đăng nhập.
+
+**Thu hồi quyền:** backend kiểm tra trạng thái member ở mỗi request, nên khoá một tài khoản có hiệu lực ngay, không phải chờ token hết hạn.
+
+**Đăng xuất:** kết thúc phiên của ứng dụng trên thiết bị đó; không đăng xuất tài khoản Google của người dùng.
+
+**Bật SSO thật:**
+1. Backend: `AUTH_MODE=firebase`.
+2. Web: trong `web/.env.local` đặt `VITE_AUTH_MODE=firebase` và điền `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` (lấy ở Firebase console → Project settings → Your apps).
+3. Firebase console → Authentication → Sign-in method: bật Google. Ở Settings → Authorized domains: thêm tên miền chạy web.

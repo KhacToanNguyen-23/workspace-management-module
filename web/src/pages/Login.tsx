@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { AUTH_MODE, ORG_DOMAIN, useAuth } from "../lib/auth";
 
 export function LoginPage() {
   const { session, ready, error, signInGoogle, signInDev } = useAuth();
   const [email, setEmail] = useState(`admin@${ORG_DOMAIN}`);
-  if (ready && session) return <Navigate to="/" replace />;
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  // Only same-site paths are accepted as a return target (no open redirect).
+  const target = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
+  if (ready && session) return <Navigate to={target} replace />;
 
   return (
     <div className="center-page">
@@ -15,7 +18,7 @@ export function LoginPage() {
           Writing <span>Bank</span>
         </h1>
         <p className="muted">
-          Đăng nhập bằng tài khoản Google <b>@{ORG_DOMAIN}</b>. Tài khoản được đối chiếu với danh sách member của lab.
+          Đăng nhập một lần (SSO) bằng tài khoản Google <b>@{ORG_DOMAIN}</b>. Tài khoản được đối chiếu với danh sách member của lab.
           Sau khi vào, chọn workspace và chờ manager duyệt.
         </p>
         {AUTH_MODE === "firebase" ? (

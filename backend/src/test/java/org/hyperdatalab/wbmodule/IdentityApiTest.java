@@ -13,6 +13,14 @@ class IdentityApiTest extends IntegrationTest {
     }
 
     @Test
+    void unauthorizedResponsesFollowRfc6750() throws Exception {
+        var res = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/me")).andReturn().getResponse();
+        assertThat(res.getStatus()).isEqualTo(401);
+        assertThat(res.getHeader("WWW-Authenticate")).startsWith("Bearer ");
+        assertThat(res.getHeader("Cache-Control")).isEqualTo("no-store");
+    }
+
+    @Test
     void healthNeedsNoToken() throws Exception {
         assertThat(get("/api/health", null).status()).isEqualTo(200);
     }

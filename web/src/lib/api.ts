@@ -16,18 +16,27 @@ export class ApiError extends Error {
 export type Api = <T = unknown>(method: string, path: string, body?: unknown) => Promise<T>;
 
 export function useApi(): Api {
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
   return useCallback(
     async <T,>(method: string, path: string, body?: unknown): Promise<T> => {
-      const token = await getToken();
-      const res = await fetch(`${BASE}/api${path}`, {
-        method,
-        headers: {
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-          ...(body !== undefined ? { "content-type": "application/json" } : {}),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
+      const send = async (forceRefresh: boolean) => {
+        const token = await getToken(forceRefresh);
+        return fetch(`${BASE}/api${path}`, {
+          method,
+          headers: {
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
+            ...(body !== undefined ? { "content-type": "application/json" } : {}),
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+      };
+      let res = await send(false);
+      if (res.status === 401) {
+        // The ID token may have just expired or been rotated: renew it once. If the backend still
+        // refuses it, end the session so the user goes back through SSO.
+        res = await send(true);
+        if (res.status === 401) await signOut();
+      }
       if (res.status === 204) return undefined as T;
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -35,7 +44,7 @@ export function useApi(): Api {
       }
       return data as T;
     },
-    [getToken],
+    [getToken, signOut],
   );
 }
 

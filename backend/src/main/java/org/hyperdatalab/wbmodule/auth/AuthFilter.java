@@ -57,6 +57,11 @@ public class AuthFilter extends OncePerRequestFilter {
 
     private void write(HttpServletResponse res, int status, String code, String message) throws IOException {
         res.setStatus(status);
+        if (status == 401) {
+            // RFC 6750: tell the client which scheme to use and why the token was refused.
+            res.setHeader("WWW-Authenticate", "Bearer realm=\"writing-bank\", error=\"invalid_token\"");
+        }
+        res.setHeader("Cache-Control", "no-store");
         res.setContentType(MediaType.APPLICATION_JSON_VALUE);
         res.setCharacterEncoding("UTF-8");
         json.writeValue(res.getOutputStream(), ErrorHandler.body(code, message));

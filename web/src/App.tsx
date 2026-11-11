@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { Navigate, NavLink, Outlet, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ErrorBox, Loading } from "./components/ui";
 import { useQuery } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -20,9 +20,11 @@ export const useMe = () => {
 
 function RequireSession({ children }: { children: ReactNode }) {
   const { session, ready, signOut } = useAuth();
+  const location = useLocation();
   const q = useQuery<Me>(session ? "/me" : null);
   if (!ready) return <Loading />;
-  if (!session) return <Navigate to="/login" replace />;
+  // Remember where the user was going so SSO brings them back to the same page.
+  if (!session) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   if (q.error) {
     return (
       <div className="center-page">

@@ -16,8 +16,12 @@ public record AppProperties(
     /**
      * mode=firebase verifies Firebase ID tokens (production);
      * mode=dev accepts `Bearer dev:<email>` and must only be used locally.
+     * allowedProviders: identity providers accepted as SSO (Firebase `sign_in_provider` values).
      */
-    public record Auth(@DefaultValue("firebase") String mode, @DefaultValue("hyperdatalab-writing-bank") String firebaseProjectId) {}
+    public record Auth(
+            @DefaultValue("firebase") String mode,
+            @DefaultValue("hyperdatalab-writing-bank") String firebaseProjectId,
+            @DefaultValue("google.com") List<String> allowedProviders) {}
 
     /**
      * Where user information for the org domain comes from.
