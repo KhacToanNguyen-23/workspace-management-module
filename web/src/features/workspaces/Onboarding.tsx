@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMe } from "../App";
-import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../components/ui";
-import { useApi, useQuery } from "../lib/api";
-import { ROLE_LABEL, type WorkspaceSummary } from "../lib/types";
+import { useMe } from "../../app/contexts";
+import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../../shared/components/ui";
+import { useApi, useQuery } from "../../shared/lib/api";
+import { ROLE_LABEL, type WorkspaceSummary } from "../../shared/lib/types";
 
 /** Pick a workspace and send a join request; a manager of that workspace must approve it. */
 export function OnboardingPage() {

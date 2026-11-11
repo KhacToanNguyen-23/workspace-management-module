@@ -44,7 +44,7 @@ Lỗi luôn có dạng `{"error": {"code": "...", "message": "..."}}`.
 | POST | `/admin/workspace-types` | Thêm loại workspace |
 | GET | `/admin/audit` | Nhật ký toàn hệ thống |
 
-## Cấu trúc backend
+## Cấu trúc mã nguồn
 
 ```
 backend/src/main/java/org/hyperdatalab/wbmodule/
@@ -54,6 +54,12 @@ backend/src/main/java/org/hyperdatalab/wbmodule/
   workspace/   AccessService (cổng kiểm tra quyền), Me/Workspace/Admin controller
   common/      Permissions, lỗi, cấu hình
 backend/src/main/resources/db/migration/V1__init.sql
+web/src/
+  app/         Router, layout và context ứng dụng
+  features/    Màn hình theo nghiệp vụ (auth, admin, workspaces)
+  shared/      Component, API client và kiểu dùng chung
+plans/         Kế hoạch và thiết kế chưa triển khai
+docs/          Hướng dẫn tích hợp
 ```
 
 ## Các bước ghép
@@ -63,7 +69,7 @@ backend/src/main/resources/db/migration/V1__init.sql
 3. **Kiểm tra quyền ở tính năng khác:** mỗi API của Writing Bank gọi `accessService.load(user, workspaceId).require("workspace.write")` (hoặc `read` / `review`). Hàm này trả 403 nếu người gọi chưa được duyệt vào workspace hoặc thiếu quyền.
 4. **Gắn dữ liệu vào workspace:** thêm cột `workspace_id` vào các bảng nội dung cần phân theo workspace.
 5. **Vai trò cũ của Writing Bank** (`member / reviewer / admin`): `admin` → `global_role = 'admin'`; `reviewer` → vai trò `member` trong một workspace loại review.
-6. **Frontend:** copy `web/src/pages/*`, `lib/{api,types}.ts`, `components/ui.tsx`. Thay `lib/auth.tsx` bằng auth provider sẵn có của Writing Bank (chỉ cần hàm `getToken()` trả Firebase ID token). Thêm route `/onboarding`, `/w/:wid`, `/w/:wid/members`, `/admin`.
+6. **Frontend:** lấy màn hình trong `web/src/features/`, component và API client dùng chung trong `web/src/shared/`. Thay `web/src/features/auth/auth.tsx` bằng auth provider sẵn có của Writing Bank (chỉ cần hàm `getToken()` trả Firebase ID token). Thêm route `/onboarding`, `/w/:wid`, `/w/:wid/members`, `/admin`.
 
 ## Lưu ý
 

@@ -1,7 +1,7 @@
-import { useMe, useWorkspace } from "../App";
-import { ErrorBox, Loading, PageHeader } from "../components/ui";
-import { useQuery } from "../lib/api";
-import { PERMISSION_LABEL, type Permission, type Person, ROLE_LABEL } from "../lib/types";
+import { useMe, useWorkspace } from "../../app/contexts";
+import { ErrorBox, Loading, PageHeader } from "../../shared/components/ui";
+import { useQuery } from "../../shared/lib/api";
+import { PERMISSION_LABEL, type Permission, type Person, ROLE_LABEL } from "../../shared/lib/types";
 
 const ALL: Permission[] = ["workspace.read", "workspace.write", "workspace.review", "members.manage"];
 

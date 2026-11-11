@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMe, useWorkspace } from "../App";
-import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../components/ui";
-import { useApi, useQuery } from "../lib/api";
-import { type AuditRow, type MemberRow, PERMISSION_LABEL, type Permission, ROLE_LABEL, type WorkspaceRole } from "../lib/types";
+import { useMe, useWorkspace } from "../../app/contexts";
+import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../../shared/components/ui";
+import { AuditTable } from "../../shared/components/AuditTable";
+import { useApi, useQuery } from "../../shared/lib/api";
+import { type AuditRow, type MemberRow, PERMISSION_LABEL, type Permission, ROLE_LABEL, type WorkspaceRole } from "../../shared/lib/types";
 
 /** Manager view: approve join requests, manage members, switch workspace permissions. */
 export function MembersPage() {
@@ -223,32 +224,3 @@ export function MembersPage() {
   );
 }
 
-export function AuditTable({ rows }: { rows: AuditRow[] | null }) {
-  if (!rows) return <Loading />;
-  return (
-    <table className="compact">
-      <thead>
-        <tr>
-          <th>Lúc</th>
-          <th>Ai</th>
-          <th>Hành động</th>
-          <th>Đối tượng</th>
-          <th>Chi tiết</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.id}>
-            <td className="small">{fmtDate(r.at)}</td>
-            <td className="small">{r.actor}</td>
-            <td>
-              <code>{r.action}</code>
-            </td>
-            <td className="small">{r.target}</td>
-            <td className="small muted">{JSON.stringify(r.detail)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}

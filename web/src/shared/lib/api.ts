@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "./auth";
+import { useAuth } from "../../features/auth/auth";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 

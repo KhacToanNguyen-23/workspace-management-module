@@ -40,6 +40,25 @@ npm run dev:backend    # http://localhost:8080 (Flyway tự tạo bảng)
 npm run dev:web        # http://localhost:5174
 ```
 
+## Cấu trúc mã nguồn
+
+```text
+backend/src/main/java/org/hyperdatalab/wbmodule/
+  auth/        Xác thực token, filter và cấu hình web
+  directory/   Các adapter user directory (HTTP, Google, mock)
+  identity/    Đồng bộ member và audit log
+  workspace/   API workspace, membership và kiểm tra quyền
+  common/      Kiểu dùng chung, lỗi và cấu hình
+web/src/
+  app/         Router, layout và context ứng dụng
+  features/    Màn hình theo nghiệp vụ (auth, admin, workspaces)
+  shared/      Component, API client và kiểu dùng chung
+plans/         Kế hoạch và thiết kế chưa triển khai
+docs/          Hướng dẫn tích hợp và tài liệu tham khảo
+```
+
+Đặt mọi tài liệu kế hoạch trong [`plans/`](plans/), không để chung với hướng dẫn sử dụng trong `docs/`.
+
 Mặc định local chạy `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`: màn đăng nhập là ô nhập email, và mọi địa chỉ `@hyperdatalab.org` đều được coi là active.
 
 Kịch bản thử:

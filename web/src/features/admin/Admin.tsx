@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMe } from "../App";
-import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../components/ui";
-import { useApi, useQuery } from "../lib/api";
-import type { AuditRow } from "../lib/types";
-import { AuditTable } from "./Members";
+import { useMe } from "../../app/contexts";
+import { Badge, ErrorBox, Loading, PageHeader, fmtDate, useAction } from "../../shared/components/ui";
+import { AuditTable } from "../../shared/components/AuditTable";
+import { useApi, useQuery } from "../../shared/lib/api";
+import type { AuditRow } from "../../shared/lib/types";
 
 interface AdminUser {
   email: string;

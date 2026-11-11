@@ -1,22 +1,15 @@
-import { createContext, useContext, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ErrorBox, Loading } from "./components/ui";
-import { useQuery } from "./lib/api";
-import { useAuth } from "./lib/auth";
-import type { Me, WorkspaceInfo } from "./lib/types";
-import { AdminPage } from "./pages/Admin";
-import { LoginPage } from "./pages/Login";
-import { MembersPage } from "./pages/Members";
-import { OnboardingPage } from "./pages/Onboarding";
-import { WorkspaceHomePage } from "./pages/WorkspaceHome";
-
-// ---- current user ----------------------------------------------------------------------
-const MeContext = createContext<{ me: Me; reload(): void } | null>(null);
-export const useMe = () => {
-  const ctx = useContext(MeContext);
-  if (!ctx) throw new Error("useMe outside MeProvider");
-  return ctx;
-};
+import { AdminPage } from "../features/admin/Admin";
+import { LoginPage } from "../features/auth/Login";
+import { useAuth } from "../features/auth/auth";
+import { MembersPage } from "../features/workspaces/Members";
+import { OnboardingPage } from "../features/workspaces/Onboarding";
+import { WorkspaceHomePage } from "../features/workspaces/WorkspaceHome";
+import { ErrorBox, Loading } from "../shared/components/ui";
+import { useQuery } from "../shared/lib/api";
+import type { Me, WorkspaceInfo } from "../shared/lib/types";
+import { MeContext, WorkspaceContext, useMe } from "./contexts";
 
 function RequireSession({ children }: { children: ReactNode }) {
   const { session, ready, signOut } = useAuth();
@@ -37,7 +30,7 @@ function RequireSession({ children }: { children: ReactNode }) {
     );
   }
   if (!q.data) return <Loading />;
-  return <MeContext.Provider value={{ me: q.data, reload: q.reload }}>{children}</MeContext.Provider>;
+  return <MeContext.Provider value={{ value: q.data, reload: q.reload }}>{children}</MeContext.Provider>;
 }
 
 /** Members must belong to an approved workspace; otherwise they land on onboarding. */
@@ -113,23 +106,15 @@ function WorkspaceNav({ wid }: { wid: string }) {
   );
 }
 
-// ---- workspace context ------------------------------------------------------------------
-const WsContext = createContext<{ info: WorkspaceInfo; reload(): void } | null>(null);
-export const useWorkspace = () => {
-  const ctx = useContext(WsContext);
-  if (!ctx) throw new Error("useWorkspace outside workspace route");
-  return ctx;
-};
-
 function WorkspaceRoute() {
   const { wid } = useParams();
   const q = useQuery<WorkspaceInfo>(`/w/${wid}`);
   if (q.error) return <ErrorBox error={q.error} />;
   if (!q.data || q.data.workspace.id !== wid) return <Loading />;
   return (
-    <WsContext.Provider value={{ info: q.data, reload: q.reload }}>
+    <WorkspaceContext.Provider value={{ value: q.data, reload: q.reload }}>
       <Outlet />
-    </WsContext.Provider>
+    </WorkspaceContext.Provider>
   );
 }
 
