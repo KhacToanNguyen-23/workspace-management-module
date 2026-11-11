@@ -4,7 +4,7 @@
 
 ## 0. Mục tiêu
 
-Hệ thống chỉ còn **3 role toàn cục** (lưu ở `users.global_role`):
+Hệ thống chỉ còn **3 role toàn cục** (lưu ở field `role` của document `users/{email}` trong Firestore):
 
 | Role | Ai | Làm được gì |
 |---|---|---|
@@ -33,67 +33,89 @@ Admin còn có thể: cấp `workspace_manager` trực tiếp cho member (không
 - Admin luôn có quyền như manager ở mọi workspace (giữ hành vi hiện tại của `AuthedUser.admin()`).
 - Mọi thay đổi đều ghi `audit_log` như hiện tại.
 
-## 2. Phase 1 — Database (Flyway `V2__roles_redesign.sql`)
+## 2. Phase 1 — Database: chuyển sang Cloud Firestore
 
-**Không sửa `V1__init.sql`.** Tạo file mới `backend/src/main/resources/db/migration/V2__roles_redesign.sql`:
+> **Thay đổi so với bản trước:** database dùng **Cloud Firestore** (Firebase project `hyperdatalab-writing-bank`), không dùng PostgreSQL / Flyway nữa. Backend Java vẫn giữ, vẫn là nơi duy nhất đọc / ghi Firestore (qua Firebase Admin SDK); web **không** truy cập Firestore trực tiếp, nên Security Rules để `deny all`.
+> Ở mọi chỗ khác trong plan, tên bảng / cột SQL (`users.global_role`, `memberships`, `audit_log`, ...) hiểu là collection / field Firestore tương ứng dưới đây; "1 transaction" nghĩa là `firestore.runTransaction(...)`.
 
-```sql
--- 1. Global roles: user -> member, thêm workspace_manager
-ALTER TABLE users DROP CONSTRAINT users_global_role_check;
-UPDATE users SET global_role = 'member' WHERE global_role = 'user';
-UPDATE users SET global_role = 'workspace_manager'
- WHERE global_role = 'member'
-   AND email IN (SELECT user_email FROM memberships WHERE role = 'manager' AND status = 'approved');
-ALTER TABLE users ALTER COLUMN global_role SET DEFAULT 'member';
-ALTER TABLE users ADD CONSTRAINT users_global_role_check
-  CHECK (global_role IN ('member', 'workspace_manager', 'admin'));
-ALTER TABLE users ADD COLUMN disabled_at TIMESTAMPTZ, ADD COLUMN disabled_by TEXT;
+### 2.1 Gỡ PostgreSQL
 
--- 2. Workspace roles: bỏ viewer
-ALTER TABLE memberships DROP CONSTRAINT memberships_role_check;
-UPDATE memberships SET role = 'member' WHERE role = 'viewer';
-ALTER TABLE memberships ADD CONSTRAINT memberships_role_check CHECK (role IN ('member', 'manager'));
+- `backend/pom.xml`: xoá `spring-boot-starter-jdbc`, `flyway-core`, `flyway-database-postgresql`, `postgresql`. Thêm `com.google.firebase:firebase-admin` (bản 9.x mới nhất ổn định). Thêm `org.testcontainers:gcloud` + `junit-jupiter` (scope test) nếu dùng Testcontainers cho emulator.
+- Xoá `backend/src/main/resources/db/migration/` (cả V1 lẫn V2 đã commit), xoá `spring.datasource` / `spring.flyway` trong `application.yml` và `application-test.yml`.
+- Không còn `JdbcClient` / `@Transactional` ở bất kỳ đâu.
 
--- 3. Bỏ bật/tắt quyền
-DROP TABLE workspace_permissions;
+### 2.2 Cấu hình
 
--- 4. Yêu cầu tạo workspace (member -> admin)
-CREATE TABLE workspace_requests (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    requester     TEXT NOT NULL REFERENCES users (email),
-    name          TEXT NOT NULL,
-    slug          TEXT NOT NULL,
-    type          TEXT NOT NULL REFERENCES workspace_types (code),
-    description   TEXT NOT NULL DEFAULT '',
-    reason        TEXT NOT NULL DEFAULT '',
-    status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'withdrawn')),
-    requested_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    decided_by    TEXT,
-    decided_at    TIMESTAMPTZ,
-    decision_note TEXT NOT NULL DEFAULT '',
-    workspace_id  UUID REFERENCES workspaces (id)        -- điền khi approved
-);
-CREATE UNIQUE INDEX uq_workspace_requests_pending ON workspace_requests (requester) WHERE status = 'pending';
-CREATE INDEX idx_workspace_requests_status ON workspace_requests (status, requested_at DESC);
+`application.yml`:
 
--- 5. Yêu cầu download paper (member -> manager của workspace)
-CREATE TABLE download_requests (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id  UUID NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
-    requester     TEXT NOT NULL REFERENCES users (email),
-    paper_ref     TEXT NOT NULL,      -- DOI / URL / tiêu đề, free text, chưa validate
-    note          TEXT NOT NULL DEFAULT '',
-    status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'withdrawn')),
-    requested_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    decided_by    TEXT,
-    decided_at    TIMESTAMPTZ,
-    decision_note TEXT NOT NULL DEFAULT ''
-);
-CREATE INDEX idx_download_requests_ws ON download_requests (workspace_id, status, requested_at DESC);
-CREATE INDEX idx_download_requests_user ON download_requests (requester, requested_at DESC);
+```yaml
+app:
+  firestore:
+    project-id: ${FIRESTORE_PROJECT_ID:hyperdatalab-writing-bank}
+    emulator-host: ${FIRESTORE_EMULATOR_HOST:}        # vd localhost:8085 khi chạy local / test
+    credentials-file: ${GOOGLE_APPLICATION_CREDENTIALS:}  # service account JSON ở production
 ```
 
-Kiểm tra tên constraint thật trước khi DROP (`\d users` trong psql); Postgres tự đặt là `users_global_role_check` / `memberships_role_check`.
+`config/FirestoreConfig.java`: tạo bean `Firestore`. Nếu có `emulator-host` → `FirestoreOptions.newBuilder().setProjectId(..).setEmulatorHost(..).setCredentials(NoCredentials.getInstance())`; ngược lại dùng credentials file (hoặc Application Default Credentials).
+
+`docker-compose.yml`: thay service `postgres` bằng Firestore emulator, ví dụ:
+
+```yaml
+services:
+  firestore:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud emulators firestore start --host-port=0.0.0.0:8085
+    ports: ["8085:8085"]
+```
+
+`package.json` root: `db:up` → `docker compose up -d firestore`; `dev:backend` chạy với `FIRESTORE_EMULATOR_HOST=localhost:8085` (cấu hình mặc định cho profile local cũng được).
+
+### 2.3 Data model (collection → document id → fields)
+
+Tên field camelCase. Thời gian lưu `Timestamp`. Email luôn lowercase.
+
+| Collection | Doc id | Fields |
+|---|---|---|
+| `users` | email | `email, authUid, name, photoUrl, department, directoryStatus ('active'\|'suspended'\|'missing'\|'unknown'), role ('member'\|'workspace_manager'\|'admin'), disabled (bool), disabledAt, disabledBy, firstSeen, lastSeen, syncedAt` |
+| `workspaceTypes` | code | `code, name, description` — seed `research`, `review`, `readonly` lúc khởi động nếu chưa có (`FirestoreSeeder`, idempotent) |
+| `workspaces` | auto id | `slug, name, type, description, status ('active'\|'archived'), createdBy, createdAt, managerEmails (array), memberCount (int), pendingCount (int)` |
+| `workspaceSlugs` | slug | `workspaceId` — khoá unique cho slug, tạo bằng `tx.create(...)` trong transaction tạo workspace (đã tồn tại → `409 duplicate`) |
+| `memberships` | `{workspaceId}_{email}` | `workspaceId, userEmail, role ('member'\|'manager'), status ('pending'\|'approved'\|'rejected'\|'revoked'), note, requestedAt, decidedBy, decidedAt, decisionNote` |
+| `workspaceRequests` | auto id | `requester, name, slug, type, description, reason, status ('pending'\|'approved'\|'rejected'\|'withdrawn'), requestedAt, decidedBy, decidedAt, decisionNote, workspaceId` |
+| `downloadRequests` | auto id | `workspaceId, requester, requesterName, paperRef, note, status ('pending'\|'approved'\|'rejected'\|'withdrawn'), requestedAt, decidedBy, decidedAt, decisionNote` |
+| `auditLog` | auto id | `at, actor, action, target, workspaceId (nullable), detail (map)` |
+
+Ràng buộc mà SQL từng lo, giờ phải tự làm trong code (trong transaction):
+
+- **1 yêu cầu tạo workspace pending / user**: lưu `users/{email}.pendingWorkspaceRequestId`; transaction tạo request đọc field này, có giá trị → `409 already_pending`; approve / reject / withdraw thì xoá field.
+- **Slug unique**: doc `workspaceSlugs/{slug}`. Request pending trùng slug: query `workspaceRequests where slug == ? and status == 'pending'` trước khi tạo.
+- **Đếm / denormalize**: `managerEmails`, `memberCount`, `pendingCount` của workspace cập nhật trong cùng transaction với thay đổi membership (approve, reject, revoke, leave, add, gán manager, hạ role).
+- **Audit**: ghi `auditLog` bằng `tx.create(...)` trong cùng transaction với thay đổi. `AuditService.log(tx, ...)` nhận transaction.
+- **Hạ role (still_managing)**: query `workspaces where managerEmails array-contains email and status == 'active'`, workspace nào có `managerEmails.size() == 1` → `409 still_managing`.
+
+Query cần dùng (khai báo composite index trong `firestore.indexes.json` ở root cho production; emulator không cần):
+
+- `memberships where userEmail == ?` (trang /me)
+- `memberships where workspaceId == ? [and status == ?]` order `requestedAt desc`
+- `workspaces where status == 'active'` order `name`
+- `workspaceRequests where status == ?` order `requestedAt desc`; `where requester == ?` order `requestedAt desc`
+- `downloadRequests where workspaceId == ? [and status == ?]` order `requestedAt desc`; `where workspaceId == ? and requester == ?`
+- `auditLog` order `at desc` limit N; `where workspaceId == ?` order `at desc`
+- Admin tìm user (`q`): đọc toàn bộ `users` (≤ 2000) rồi lọc trong bộ nhớ theo email / name, role, disabled.
+
+Thêm `firestore.rules` ở root: `rules_version = '2'; service cloud.firestore { match /databases/{db}/documents { match /{doc=**} { allow read, write: if false; } } }`.
+
+### 2.4 Tầng truy cập dữ liệu
+
+Tạo package `store/` (hoặc repository theo từng aggregate: `UserStore`, `WorkspaceStore`, `MembershipStore`, `RequestStore`, `DownloadRequestStore`, `AuditService`) bọc Firestore, trả về record Java. Controller không gọi Firestore trực tiếp. Gọi `.get()` trên `ApiFuture` là chấp nhận được (code đồng bộ). Exception trong lambda transaction: ném `ApiException` và unwrap từ `ExecutionException` để `ErrorHandler` trả đúng status.
+
+`IdentityService.resolve` / `refreshFromDirectory` / `syncDirectory` viết lại trên `users` collection, giữ nguyên hành vi (upsert vẫn lưu dù bị từ chối, forced admin, check disabled / suspended / missing). Sync dùng `BulkWriter` hoặc batch ≤ 500.
+
+### 2.5 Test
+
+- Test chạy trên **Firestore emulator**: dùng Testcontainers `FirestoreEmulatorContainer` (image như docker-compose) hoặc, nếu môi trường không chạy được Testcontainers, đọc `FIRESTORE_EMULATOR_HOST` có sẵn (`npm run db:up`). Ghi rõ trong README cách nào được dùng.
+- Trước mỗi test xoá sạch dữ liệu: `DELETE http://{emulatorHost}/emulator/v1/projects/{projectId}/databases/(default)/documents`, rồi chạy lại seeder.
+- Sửa `IntegrationTest` base class cho phù hợp (bỏ mọi thứ liên quan Postgres).
 
 ## 3. Phase 2 — Backend core
 
@@ -261,7 +283,8 @@ Sửa test cũ cho khớp (bỏ test về permissions toggle / viewer / đổi r
 
 ## 9. Checklist nghiệm thu
 
-- [ ] `npm run db:up && npm test` xanh (DB test `wb_module_test` có sẵn, xem README).
+- [ ] `npm test` xanh trên Firestore emulator (Testcontainers hoặc `npm run db:up`).
+- [ ] Không còn PostgreSQL / Flyway / `JdbcClient` / `@Transactional` trong `backend/` (`grep -rn "jdbc\|flyway\|postgres\|Transactional" backend/`).
 - [ ] `npm run typecheck && npm run build` pass.
 - [ ] Không còn tham chiếu tới `Permissions`, `workspace_permissions`, `viewer`, `global_role = 'user'` (`grep -rn` để chắc).
 - [ ] Chạy tay kịch bản ở Phase 6 với `AUTH_MODE=dev`, `DIRECTORY_MODE=mock`.

@@ -1,78 +1,70 @@
-# API và cách ghép vào repo Writing Bank
+# Tích hợp module Writing Bank
 
-## API (prefix `/api`, header `Authorization: Bearer <Firebase ID token>`)
+## Kiến trúc dữ liệu
 
-Lỗi luôn có dạng `{"error": {"code": "...", "message": "..."}}`.
+Java backend dùng Firebase Admin SDK để đọc và ghi Cloud Firestore. Web chỉ gọi API `/api`; không kết nối Firestore trực tiếp. Firestore Security Rules mặc định chặn toàn bộ client access.
 
-### Member hiện tại
+Các collection: `users`, `workspaceTypes`, `workspaces`, `workspaceSlugs`, `memberships`, `workspaceRequests`, `downloadRequests`, `auditLog`. Tên field dùng camelCase. Xem mô hình đầy đủ trong [plan roles redesign](../plans/roles-redesign.md).
 
-| Method | Path | Mô tả |
-|---|---|---|
-| GET | `/health` | Không cần đăng nhập |
-| GET | `/me` | Thông tin member (tên, phòng ban, trạng thái danh bạ, có phải admin) và mọi membership kèm quyền thực tế |
-| GET | `/workspaces` | Các workspace đang hoạt động, kèm trạng thái của mình ở từng workspace |
-| GET | `/workspace-types` | Các loại workspace |
-| POST | `/workspaces/{id}/join` | Gửi yêu cầu tham gia (`{note}`) |
-| DELETE | `/workspaces/{id}/join` | Rút yêu cầu hoặc rời workspace |
+Trong local, chạy `npm run db:up` để bật Firestore emulator tại `localhost:8085`. Backend dùng `FIRESTORE_EMULATOR_HOST=localhost:8085`; production cấu hình `FIRESTORE_PROJECT_ID` và Application Default Credentials hoặc `GOOGLE_APPLICATION_CREDENTIALS`. Triển khai index từ `firestore.indexes.json`.
 
-### Trong một workspace (`/w/{wid}`), cần membership đã duyệt hoặc là admin
+## API
 
-| Method | Path | Quyền |
-|---|---|---|
-| GET | `/w/{wid}` | thành viên — thông tin workspace, vai trò, quyền thực tế |
-| GET | `/w/{wid}/people` | `workspace.read` — danh sách thành viên đã duyệt |
-| GET | `/w/{wid}/members?status=` | `members.manage` — cả hàng chờ duyệt |
-| POST | `/w/{wid}/members` | `members.manage` — thêm thẳng một member (`{email, role}`) |
-| POST | `/w/{wid}/members/{mid}/approve` | `members.manage` (`{role, note}`) |
-| POST | `/w/{wid}/members/{mid}/reject` | `members.manage` (`{note}`) |
-| POST | `/w/{wid}/members/{mid}/revoke` | `members.manage` |
-| PATCH | `/w/{wid}/members/{mid}` | `members.manage` — đổi vai trò; liên quan manager thì chỉ admin |
-| PUT | `/w/{wid}/permissions` | `members.manage` — `{permissions: [...]}` |
-| GET | `/w/{wid}/audit` | `members.manage` |
+Các route (ngoài `/health`) yêu cầu `Authorization: Bearer <Firebase ID token>`. Lỗi có dạng `{"error":{"code":"...","message":"..."}}`.
 
-### Admin (`/admin`)
+### Profile và workspace
 
 | Method | Path | Mô tả |
 |---|---|---|
-| GET | `/admin/users?q=&status=` | Toàn bộ member và workspace của từng người |
-| POST | `/admin/users/sync` | Đồng bộ toàn bộ từ user directory |
-| POST | `/admin/users/{email}/refresh` | Lấy lại thông tin một member từ user directory |
-| PATCH | `/admin/users/{email}` | `{disabled, globalRole}` |
-| GET / POST | `/admin/workspaces` | Danh sách / tạo (`{name, slug, type, description, managers}`) |
-| PATCH | `/admin/workspaces/{id}` | Đổi tên, loại, lưu trữ |
-| POST | `/admin/workspaces/{id}/managers` | Gán manager (`{email}`) |
-| POST | `/admin/workspace-types` | Thêm loại workspace |
-| GET | `/admin/audit` | Nhật ký toàn hệ thống |
+| GET | `/api/me` | User, global role, memberships, `canManage` và yêu cầu tạo workspace gần nhất. |
+| GET | `/api/workspaces` | Workspace đang hoạt động và trạng thái membership của caller. |
+| GET | `/api/workspace-types` | Loại workspace. |
+| POST | `/api/workspaces` | Tạo workspace trực tiếp; chỉ `workspace_manager` hoặc admin. |
+| POST / DELETE | `/api/workspaces/{id}/join` | Gửi yêu cầu tham gia / rút hoặc rời workspace. |
+| POST / GET | `/api/workspace-requests` | Tạo yêu cầu workspace / danh sách của caller tại `/mine`. |
+| DELETE | `/api/workspace-requests/{id}` | Rút yêu cầu tạo workspace pending của caller. |
 
-## Cấu trúc mã nguồn
+### Trong workspace
 
-```
-backend/src/main/java/org/hyperdatalab/wbmodule/
-  auth/        verify token (Firebase hoặc dev), AuthFilter, CORS
-  directory/   UserDirectory + 3 bản: HTTP, Google, mock
-  identity/    IdentityService (liên kết tài khoản ↔ user, đồng bộ), AuditService
-  workspace/   AccessService (cổng kiểm tra quyền), Me/Workspace/Admin controller
-  common/      Permissions, lỗi, cấu hình
-backend/src/main/resources/db/migration/V1__init.sql
-web/src/
-  app/         Router, layout và context ứng dụng
-  features/    Màn hình theo nghiệp vụ (auth, admin, workspaces)
-  shared/      Component, API client và kiểu dùng chung
-plans/         Kế hoạch và thiết kế chưa triển khai
-docs/          Hướng dẫn tích hợp
-```
+| Method | Path | Quyền và mô tả |
+|---|---|---|
+| GET | `/api/w/{id}` | Member đã duyệt; trả workspace, role và `canManage`. |
+| GET | `/api/w/{id}/people` | Member đã duyệt; danh sách member đã duyệt. |
+| GET | `/api/w/{id}/members` | Manager; hàng đợi và danh sách member. |
+| POST | `/api/w/{id}/members` | Manager; thêm trực tiếp một member (`{email}`). |
+| POST | `/api/w/{id}/members/{mid}/approve` | Manager; duyệt yêu cầu tham gia (`{note}`). |
+| POST | `/api/w/{id}/members/{mid}/reject` | Manager; từ chối yêu cầu tham gia (`{note}`). |
+| POST | `/api/w/{id}/members/{mid}/revoke` | Manager; thu hồi member. |
+| GET | `/api/w/{id}/audit` | Manager; audit log workspace. |
+| POST | `/api/w/{id}/download-requests` | Member đã duyệt; tạo request `{paperRef, note}`. |
+| GET | `/api/w/{id}/download-requests/mine` | Member; request của caller. |
+| DELETE | `/api/w/{id}/download-requests/{rid}` | Requester; rút request pending. |
+| GET | `/api/w/{id}/download-requests` | Manager; hàng đợi request. |
+| POST | `/api/w/{id}/download-requests/{rid}/approve` | Manager; duyệt request, không tạo file hoặc link. |
+| POST | `/api/w/{id}/download-requests/{rid}/reject` | Manager; từ chối request. |
 
-## Các bước ghép
+### Admin
 
-1. **Database:** chạy `V1__init.sql` trên PostgreSQL của Writing Bank (6 bảng: `users`, `workspace_types`, `workspaces`, `workspace_permissions`, `memberships`, `audit_log`).
-2. **Backend:** nếu Writing Bank cũng là Spring Boot thì copy các package ở trên. Nếu là stack khác thì chạy module như một service riêng và gọi qua API.
-3. **Kiểm tra quyền ở tính năng khác:** mỗi API của Writing Bank gọi `accessService.load(user, workspaceId).require("workspace.write")` (hoặc `read` / `review`). Hàm này trả 403 nếu người gọi chưa được duyệt vào workspace hoặc thiếu quyền.
-4. **Gắn dữ liệu vào workspace:** thêm cột `workspace_id` vào các bảng nội dung cần phân theo workspace.
-5. **Vai trò cũ của Writing Bank** (`member / reviewer / admin`): `admin` → `global_role = 'admin'`; `reviewer` → vai trò `member` trong một workspace loại review.
-6. **Frontend:** lấy màn hình trong `web/src/features/`, component và API client dùng chung trong `web/src/shared/`. Thay `web/src/features/auth/auth.tsx` bằng auth provider sẵn có của Writing Bank (chỉ cần hàm `getToken()` trả Firebase ID token). Thêm route `/onboarding`, `/w/:wid`, `/w/:wid/members`, `/admin`.
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/admin/users?q=&role=&disabled=` | Tìm user và xem workspace của từng người. |
+| PATCH | `/api/admin/users/{email}` | Cập nhật `{role, disabled}`; admin gốc không thể thay đổi. |
+| POST | `/api/admin/users/sync` | Đồng bộ directory. |
+| POST | `/api/admin/users/{email}/refresh` | Làm mới một user từ directory. |
+| GET | `/api/admin/workspace-requests?status=pending` | Hàng đợi yêu cầu tạo workspace. |
+| POST | `/api/admin/workspace-requests/{id}/approve` | Duyệt, có thể chỉnh tên, slug, type và description. |
+| POST | `/api/admin/workspace-requests/{id}/reject` | Từ chối với ghi chú. |
+| GET / POST | `/api/admin/workspaces` | Danh sách / tạo workspace. |
+| PATCH | `/api/admin/workspaces/{id}` | Đổi tên, mô tả hoặc trạng thái. |
+| POST | `/api/admin/workspaces/{id}/managers` | Gán manager; member được tự nâng thành `workspace_manager`. |
+| POST | `/api/admin/workspace-types` | Thêm loại workspace. |
+| GET | `/api/admin/audit` | Audit log toàn hệ thống. |
 
-## Lưu ý
+## Ghép backend
 
-- Kết quả kiểm tra user directory được cache 12 giờ cho mỗi member (`app.directory.cache-hours`). Người đã rời tên miền bị chặn ở lần kiểm tra kế tiếp hoặc sau lần đồng bộ đêm.
-- User bị từ chối đăng nhập (không có trong danh bạ, bị đình chỉ) vẫn được ghi vào bảng `users` để admin thấy.
-- `AUTH_MODE=dev` chấp nhận token `dev:<email>` không cần mật khẩu; chỉ dùng trên máy local.
+1. Cấu hình service account và Firestore project của Writing Bank.
+2. Chép `auth/`, `config/`, `directory/`, `identity/`, `store/`, `workspace/` và `common/` hoặc chạy module này như một service riêng.
+3. Gọi API từ frontend; không tạo Firestore client phía web. Chuyển Firebase ID token vào header `Authorization`.
+4. Tính năng nội dung thuộc workspace cần kiểm tra membership đã duyệt và `canManage`/role phù hợp ở backend.
+
+Role toàn cục chỉ gồm `admin`, `workspace_manager`, `member`; role membership chỉ `manager` hoặc `member`. Audit log được ghi cùng Firestore transaction cho các thay đổi role, workspace, membership và request.
