@@ -25,8 +25,8 @@
   --radius-panel: 16px;
   --shadow-sm: 0 1px 3px rgb(23 43 77 / 0.08);
   --shadow-md: 0 10px 30px rgb(23 43 77 / 0.08);
-  --shadow-panel: 0 16px 48px rgb(0 113 188 / 0.1),
-    0 2px 8px rgb(18 35 49 / 0.04);
+  --shadow-panel:
+    0 16px 48px rgb(0 113 188 / 0.1), 0 2px 8px rgb(18 35 49 / 0.04);
   color-scheme: light;
 }
 
@@ -507,6 +507,28 @@ details summary {
 }
 .card.narrow h1 span {
   color: var(--primary);
+}
+
+/* Dev-only quick login (VITE_AUTH_MODE=dev) */
+.dev-accounts {
+  display: grid;
+  gap: 8px;
+}
+.dev-account {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  height: auto;
+  white-space: normal;
+  font-weight: 500;
+}
+.dev-account:hover {
+  border-color: var(--primary);
+}
+.dev-switcher {
+  margin-top: 12px;
 }
 
 @media (max-width: 760px) {

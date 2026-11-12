@@ -11,7 +11,8 @@ import {
 } from "react-router-dom";
 import { AdminPage } from "../features/admin/Admin";
 import { LoginPage } from "../features/auth/Login";
-import { useAuth } from "../features/auth/auth";
+import { AUTH_MODE, useAuth } from "../features/auth/auth";
+import { DevAccountSwitcher } from "../features/auth/DevAccounts";
 import { MembersPage } from "../features/workspaces/Members";
 import { OnboardingPage } from "../features/workspaces/Onboarding";
 import { WorkspaceHomePage } from "../features/workspaces/WorkspaceHome";
@@ -107,7 +108,7 @@ function Shell() {
             ? "Tham gia / xin tạo workspace"
             : "Tham gia workspace"}
         </NavLink>
-        {me.user.role === "workspace_manager" && (
+        {me.user.role !== "member" && (
           <NavLink to="/create-workspace">Tạo workspace</NavLink>
         )}
         {me.user.isAdmin && <NavLink to="/admin">Quản trị</NavLink>}
@@ -118,6 +119,9 @@ function Shell() {
           <button className="link" onClick={() => void signOut()}>
             Đăng xuất
           </button>
+          {AUTH_MODE === "dev" && (
+            <DevAccountSwitcher current={me.user.email} />
+          )}
         </div>
       </aside>
       <main className="content">

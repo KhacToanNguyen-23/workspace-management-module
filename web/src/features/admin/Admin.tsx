@@ -168,9 +168,7 @@ function RequestsTab() {
   const q = useQuery<WorkspaceRequest[]>(
     "/admin/workspace-requests?status=pending",
   );
-  const [edits, setEdits] = useState<
-    Record<string, { name: string; slug: string }>
-  >({});
+  const [edits, setEdits] = useState<Record<string, { name: string }>>({});
   const refresh = () => q.reload();
   return (
     <section className="card">
@@ -191,7 +189,7 @@ function RequestsTab() {
           </thead>
           <tbody>
             {q.data.map((r) => {
-              const e = edits[r.id] ?? { name: r.name, slug: r.slug };
+              const e = edits[r.id] ?? { name: r.name };
               return (
                 <tr key={r.id}>
                   <td>
@@ -207,15 +205,6 @@ function RequestsTab() {
                         setEdits({
                           ...edits,
                           [r.id]: { ...e, name: x.target.value },
-                        })
-                      }
-                    />
-                    <input
-                      value={e.slug}
-                      onChange={(x) =>
-                        setEdits({
-                          ...edits,
-                          [r.id]: { ...e, slug: x.target.value },
                         })
                       }
                     />
@@ -282,7 +271,6 @@ function WorkspacesTab() {
   const [promotionMessage, setPromotionMessage] = useState("");
   const [form, setForm] = useState({
     name: "",
-    slug: "",
     type: "research",
     description: "",
     managers: "",
@@ -311,21 +299,7 @@ function WorkspacesTab() {
             required
             placeholder="Tên"
             value={form.name}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                name: e.target.value,
-                slug:
-                  form.slug ||
-                  e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-              })
-            }
-          />
-          <input
-            required
-            placeholder="slug"
-            value={form.slug}
-            onChange={(e) => setForm({ ...form, slug: e.target.value })}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
           <select
             value={form.type}
@@ -370,7 +344,7 @@ function WorkspacesTab() {
                 <tr key={w.id}>
                   <td>
                     {w.name}
-                    <div className="small muted">{w.slug}</div>
+                    <div className="small muted">{w.type}</div>
                   </td>
                   <td>
                     {(w.managers ?? []).join(", ")}
