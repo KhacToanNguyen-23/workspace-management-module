@@ -78,17 +78,16 @@ Tên field camelCase. Thời gian lưu `Timestamp`. Email luôn lowercase.
 |---|---|---|
 | `users` | email | `email, authUid, name, photoUrl, department, directoryStatus ('active'\|'suspended'\|'missing'\|'unknown'), role ('member'\|'workspace_manager'\|'admin'), disabled (bool), disabledAt, disabledBy, firstSeen, lastSeen, syncedAt` |
 | `workspaceTypes` | code | `code, name, description` — seed `research`, `review`, `readonly` lúc khởi động nếu chưa có (`FirestoreSeeder`, idempotent) |
-| `workspaces` | auto id | `slug, name, type, description, status ('active'\|'archived'), createdBy, createdAt, managerEmails (array), memberCount (int), pendingCount (int)` |
-| `workspaceSlugs` | slug | `workspaceId` — khoá unique cho slug, tạo bằng `tx.create(...)` trong transaction tạo workspace (đã tồn tại → `409 duplicate`) |
+| `workspaces` | auto id | `name, type, description, status ('active'\|'archived'), createdBy, createdAt, managerEmails (array), memberCount (int), pendingCount (int)` |
 | `memberships` | `{workspaceId}_{email}` | `workspaceId, userEmail, role ('member'\|'manager'), status ('pending'\|'approved'\|'rejected'\|'revoked'), note, requestedAt, decidedBy, decidedAt, decisionNote` |
-| `workspaceRequests` | auto id | `requester, name, slug, type, description, reason, status ('pending'\|'approved'\|'rejected'\|'withdrawn'), requestedAt, decidedBy, decidedAt, decisionNote, workspaceId` |
+| `workspaceRequests` | auto id | `requester, name, type, description, reason, status ('pending'\|'approved'\|'rejected'\|'withdrawn'), requestedAt, decidedBy, decidedAt, decisionNote, workspaceId` |
 | `downloadRequests` | auto id | `workspaceId, requester, requesterName, paperRef, note, status ('pending'\|'approved'\|'rejected'\|'withdrawn'), requestedAt, decidedBy, decidedAt, decisionNote` |
 | `auditLog` | auto id | `at, actor, action, target, workspaceId (nullable), detail (map)` |
 
 Ràng buộc mà SQL từng lo, giờ phải tự làm trong code (trong transaction):
 
 - **1 yêu cầu tạo workspace pending / user**: lưu `users/{email}.pendingWorkspaceRequestId`; transaction tạo request đọc field này, có giá trị → `409 already_pending`; approve / reject / withdraw thì xoá field.
-- **Slug unique**: doc `workspaceSlugs/{slug}`. Request pending trùng slug: query `workspaceRequests where slug == ? and status == 'pending'` trước khi tạo.
+- **Không có slug** (đã bỏ sau khi triển khai): workspace định danh bằng document id; URL và API đều dùng id, tên workspace được phép trùng.
 - **Đếm / denormalize**: `managerEmails`, `memberCount`, `pendingCount` của workspace cập nhật trong cùng transaction với thay đổi membership (approve, reject, revoke, leave, add, gán manager, hạ role).
 - **Audit**: ghi `auditLog` bằng `tx.create(...)` trong cùng transaction với thay đổi. `AuditService.log(tx, ...)` nhận transaction.
 - **Hạ role (still_managing)**: query `workspaces where managerEmails array-contains email and status == 'active'`, workspace nào có `managerEmails.size() == 1` → `409 still_managing`.
@@ -154,13 +153,13 @@ Giữ style hiện có: `JdbcClient`, record body + `@Valid`, `ApiException`, `@
 
 - `GET /api/me` → `user` thêm `role` (`admin|workspace_manager|member`) và `disabled`; giữ `isAdmin` cho tương thích. Mỗi membership bỏ `permissions`, thêm `canManage` (bool). Thêm `workspaceRequest`: request tạo workspace gần nhất của user (hoặc `null`).
 - `GET /api/workspaces`, `POST|DELETE /api/workspaces/{id}/join`: giữ nguyên; join tạo membership role `member`.
-- **Mới** `POST /api/workspaces` — chỉ `workspaceManager()`; body `{name, slug, type, description}`; tạo workspace + membership manager cho chính mình. Tách logic tạo workspace ra `WorkspaceService.create(actor, name, slug, type, description, managerEmail)` để dùng chung với admin và với lúc duyệt request.
+- **Mới** `POST /api/workspaces` — chỉ `workspaceManager()`; body `{name, type, description}`; tạo workspace + membership manager cho chính mình. Tách logic tạo workspace ra `WorkspaceService.create(actor, name, type, description, managerEmail)` để dùng chung với admin và với lúc duyệt request.
 
 ### 4.2 `WorkspaceRequestController` (mới, `/api/workspace-requests`) — phía member
 
 | Method | Path | Ghi chú |
 |---|---|---|
-| POST | `/api/workspace-requests` | Body `{name, slug, type, description?, reason?}`. Validate như `WorkspaceCreate`. `409 already_pending` nếu đã có pending. `409 duplicate` nếu slug đã có workspace hoặc đã có request pending khác dùng slug đó. `422 unknown_type`. Trả `201 {id, status:"pending"}`. Audit `workspace_request.create`. |
+| POST | `/api/workspace-requests` | Body `{name, type, description?, reason?}`. Validate như `WorkspaceCreate`. `409 already_pending` nếu đã có pending. `422 unknown_type`. Trả `201 {id, status:"pending"}`. Audit `workspace_request.create`. |
 | GET | `/api/workspace-requests/mine` | Danh sách request của chính mình, mới nhất trước. |
 | DELETE | `/api/workspace-requests/{id}` | Rút lại request `pending` của chính mình → `withdrawn`. `404` nếu không phải của mình / không pending. |
 
@@ -175,10 +174,10 @@ Giữ style hiện có: `JdbcClient`, record body + `@Valid`, `ApiException`, `@
   - `disabled=true` → set `disabled_at=now(), disabled_by=actor`; `false` → xoá 2 cột đó.
   - Audit `user.role` và / hoặc `user.disable` / `user.enable`.
 - **Mới** `GET /api/admin/workspace-requests?status=pending` → kèm thông tin requester (name, email, department, role).
-- **Mới** `POST /api/admin/workspace-requests/{id}/approve` body `{note?, name?, slug?, type?, description?}` (admin được chỉnh trước khi duyệt). Một transaction:
+- **Mới** `POST /api/admin/workspace-requests/{id}/approve` body `{note?, name?, type?, description?}` (admin được chỉnh trước khi duyệt). Một transaction:
   1. request phải `pending` (`409 not_pending`), requester không bị disable (`409 inactive_user`);
   2. nếu requester là `member` → nâng lên `workspace_manager`;
-  3. `WorkspaceService.create(...)` với requester là manager (slug trùng → `409 duplicate`);
+  3. `WorkspaceService.create(...)` với requester là manager;
   4. cập nhật request `approved`, `workspace_id`, `decided_*`;
   5. audit `workspace_request.approve`.
   Trả `{requestId, workspaceId, status:"approved"}`.
@@ -224,7 +223,6 @@ Sửa test cũ cho khớp (bỏ test về permissions toggle / viewer / đổi r
 - Member gửi request → pending; gửi lần 2 → `409 already_pending`; rút lại → `withdrawn` và gửi lại được.
 - Admin duyệt → requester thành `workspace_manager`, workspace tồn tại, requester là manager, `/api/me` có membership đó.
 - Admin từ chối → status `rejected`, không tạo workspace.
-- Slug trùng → `409 duplicate`.
 - `workspace_manager` tạo workspace trực tiếp được; `member` gọi `POST /api/workspaces` → `403`.
 
 **WorkspaceApiTest**
@@ -251,13 +249,13 @@ Sửa test cũ cho khớp (bỏ test về permissions toggle / viewer / đổi r
   - Thêm nav "Yêu cầu download" trong workspace (member: request của mình; manager: hàng đợi).
   - `workspace_manager` có nav "Tạo workspace"; `member` có "Xin tạo workspace".
   - `Home()`: giữ logic, nhưng `workspace_manager` chưa có workspace thì đi tới trang tạo workspace.
-- `pages/Onboarding.tsx`: giữ phần xin vào workspace; thêm card "Xin tạo workspace mới" (form name / slug / type / description / reason) và trạng thái request hiện tại (pending → nút rút lại; rejected → hiện lý do + cho gửi lại).
+- `pages/Onboarding.tsx`: giữ phần xin vào workspace; thêm card "Xin tạo workspace mới" (form name / type / description / reason; admin và workspace_manager thấy link tạo trực tiếp thay cho form) và trạng thái request hiện tại (pending → nút rút lại; rejected → hiện lý do + cho gửi lại).
 - **Mới** `pages/CreateWorkspace.tsx` cho `workspace_manager` (gọi `POST /api/workspaces`). Có thể tái dùng form trong Onboarding.
 - `pages/WorkspaceHome.tsx`: thêm form "Gửi yêu cầu download paper" (paperRef + note) và bảng request của tôi (status, ngày, ghi chú của manager, nút rút lại khi pending).
 - `pages/Members.tsx`: bỏ phần bật / tắt quyền và dropdown đổi role. Giữ hàng đợi xin vào + danh sách thành viên + thêm trực tiếp + thu hồi. Thêm tab "Yêu cầu download" (list + approve / reject có note).
 - `pages/Admin.tsx`: tab
   1. **Người dùng**: bảng user, lọc theo role / disabled, `<select>` đổi role, nút Disable / Enable (confirm trước), hiện lỗi `still_managing` rõ ràng.
-  2. **Yêu cầu tạo workspace**: hàng đợi pending, xem chi tiết, sửa name / slug trước khi duyệt, Duyệt / Từ chối có note.
+  2. **Yêu cầu tạo workspace**: hàng đợi pending, xem chi tiết, sửa name trước khi duyệt, Duyệt / Từ chối có note.
   3. **Workspace**: như hiện tại; ô gán manager cho chọn mọi user active, nếu chọn một `member` thì hiện confirm "Người này sẽ được nâng lên Quản lý workspace"; bỏ phần permissions.
   4. **Nhật ký**: giữ.
 - Giữ style hiện có (`styles.css`, `components/ui.tsx`), text tiếng Việt.
