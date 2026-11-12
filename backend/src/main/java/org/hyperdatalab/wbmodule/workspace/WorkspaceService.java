@@ -42,32 +42,26 @@ public class WorkspaceService {
     public String create(
             AuthedUser actor,
             String name,
-            String slug,
             String type,
             String description,
             String managerEmail) {
         return firestore.transaction(
                 transaction ->
-                        create(transaction, actor, name, slug, type, description, managerEmail));
+                        create(transaction, actor, name, type, description, managerEmail));
     }
 
     public String create(
             Transaction transaction,
             AuthedUser actor,
             String name,
-            String slug,
             String type,
             String description,
             String managerEmail) {
         DocumentReference typeRef = firestore.doc("workspaceTypes", type);
-        DocumentReference slugRef = firestore.doc("workspaceSlugs", slug);
         DocumentReference userRef = firestore.doc("users", managerEmail);
         if (!FirestoreStore.await(transaction.get(typeRef)).exists()) {
             throw ApiException.unprocessable(
                     "unknown_type", "Unknown workspace type \"" + type + "\".");
-        }
-        if (FirestoreStore.await(transaction.get(slugRef)).exists()) {
-            throw ApiException.conflict("duplicate", "Slug already used.");
         }
 
         DocumentSnapshot user = FirestoreStore.await(transaction.get(userRef));
@@ -98,7 +92,6 @@ public class WorkspaceService {
                 transaction,
                 new WorkspaceStore.Workspace(
                         id,
-                        slug,
                         name.trim(),
                         type,
                         description == null ? "" : description,
@@ -108,7 +101,6 @@ public class WorkspaceService {
                         List.of(managerEmail),
                         1,
                         0));
-        workspaces.createSlug(transaction, slug, id);
         memberships.save(
                 transaction,
                 new MembershipStore.Membership(
@@ -128,7 +120,7 @@ public class WorkspaceService {
                 "workspace.create",
                 id,
                 id,
-                Map.of("name", name, "slug", slug, "type", type));
+                Map.of("name", name, "type", type));
         return id;
     }
 }

@@ -3,6 +3,7 @@ app:
     project-id: wb-module-test
     emulator-host: ${FIRESTORE_EMULATOR_HOST:localhost:8085}
     credentials-file: ''
+  dev-seed: false
   auth:
     mode: dev
   directory:

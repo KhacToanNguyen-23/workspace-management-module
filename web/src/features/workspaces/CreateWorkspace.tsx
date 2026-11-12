@@ -10,7 +10,6 @@ export function CreateWorkspacePage() {
   const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
   const [form, setForm] = useState({
     name: "",
-    slug: "",
     type: "research",
     description: "",
   });
@@ -37,25 +36,7 @@ export function CreateWorkspacePage() {
             required
             placeholder="Tên workspace"
             value={form.name}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                name: e.target.value,
-                slug:
-                  form.slug ||
-                  e.target.value
-                    .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/^-|-$/g, ""),
-              })
-            }
-          />
-          <input
-            required
-            placeholder="slug"
-            value={form.slug}
-            onChange={(e) => setForm({ ...form, slug: e.target.value })}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
           <select
             value={form.type}

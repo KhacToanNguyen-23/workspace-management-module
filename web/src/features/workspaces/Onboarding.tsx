@@ -12,7 +12,10 @@ import {
 import { useApi, useQuery } from "../../shared/lib/api";
 import { ROLE_LABEL, type WorkspaceSummary } from "../../shared/lib/types";
 
-/** Pick a workspace and send a join request; a manager of that workspace must approve it. */
+/**
+ * Pick a workspace and send a join request (a manager of that workspace approves it), or ask an
+ * admin to create a new workspace. Workspace managers and admins create workspaces directly.
+ */
 export function OnboardingPage() {
   const api = useApi();
   const { me, reload: reloadMe } = useMe();
@@ -21,13 +24,13 @@ export function OnboardingPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [workspaceForm, setWorkspaceForm] = useState({
     name: "",
-    slug: "",
     type: "research",
     description: "",
     reason: "",
   });
   const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
   const approved = me.memberships.some((m) => m.status === "approved");
+  const canCreateDirectly = me.user.role !== "member";
 
   const refresh = () => {
     list.reload();
@@ -104,110 +107,107 @@ export function OnboardingPage() {
       )}
 
       <ErrorBox error={act.error ?? list.error} />
-      <section className="card">
-        <h3>Xin tạo workspace mới</h3>
-        {me.workspaceRequest && (
-          <p>
-            Yêu cầu gần nhất: <Badge value={me.workspaceRequest.status} />{" "}
-            {me.workspaceRequest.name}{" "}
-            {me.workspaceRequest.decisionNote &&
-              `· ${me.workspaceRequest.decisionNote}`}
-            {me.workspaceRequest.status === "pending" && (
-              <button
-                className="link"
-                onClick={() =>
-                  void act
-                    .run(() =>
-                      api(
-                        "DELETE",
-                        `/workspace-requests/${me.workspaceRequest!.id}`,
-                      ),
-                    )
-                    .then(refresh)
-                }
-              >
-                Rút yêu cầu
-              </button>
-            )}
+      {canCreateDirectly ? (
+        <section className="card">
+          <h3>Tạo workspace mới</h3>
+          <p className="muted">
+            Bạn có quyền quản lý workspace nên tạo được ngay, không cần admin
+            duyệt.
           </p>
-        )}
-        {me.workspaceRequest?.status !== "pending" && (
-          <form
-            className="stack"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act
-                .run(() => api("POST", "/workspace-requests", workspaceForm))
-                .then(refresh);
-            }}
-          >
-            <div className="row wrap">
+          <Link to="/create-workspace">Tạo workspace</Link>
+        </section>
+      ) : (
+        <section className="card">
+          <h3>Xin tạo workspace mới</h3>
+          {me.workspaceRequest && (
+            <p>
+              Yêu cầu gần nhất: <Badge value={me.workspaceRequest.status} />{" "}
+              {me.workspaceRequest.name}{" "}
+              {me.workspaceRequest.decisionNote &&
+                `· ${me.workspaceRequest.decisionNote}`}
+              {me.workspaceRequest.status === "pending" && (
+                <button
+                  className="link"
+                  onClick={() =>
+                    void act
+                      .run(() =>
+                        api(
+                          "DELETE",
+                          `/workspace-requests/${me.workspaceRequest!.id}`,
+                        ),
+                      )
+                      .then(refresh)
+                  }
+                >
+                  Rút yêu cầu
+                </button>
+              )}
+            </p>
+          )}
+          {me.workspaceRequest?.status !== "pending" && (
+            <form
+              className="stack"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void act
+                  .run(() => api("POST", "/workspace-requests", workspaceForm))
+                  .then(refresh);
+              }}
+            >
+              <div className="row wrap">
+                <input
+                  placeholder="Tên workspace"
+                  required
+                  value={workspaceForm.name}
+                  onChange={(e) =>
+                    setWorkspaceForm({ ...workspaceForm, name: e.target.value })
+                  }
+                />
+                <select
+                  value={workspaceForm.type}
+                  onChange={(e) =>
+                    setWorkspaceForm({ ...workspaceForm, type: e.target.value })
+                  }
+                >
+                  {(types.data ?? []).map((t) => (
+                    <option key={t.code} value={t.code}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <input
-                placeholder="Tên workspace"
-                required
-                value={workspaceForm.name}
+                placeholder="Mô tả"
+                value={workspaceForm.description}
                 onChange={(e) =>
                   setWorkspaceForm({
                     ...workspaceForm,
-                    name: e.target.value,
-                    slug:
-                      workspaceForm.slug ||
-                      e.target.value
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/^-|-$/g, ""),
+                    description: e.target.value,
                   })
                 }
               />
-              <input
-                placeholder="slug"
-                required
-                value={workspaceForm.slug}
+              <textarea
+                placeholder="Lý do xin tạo"
+                value={workspaceForm.reason}
                 onChange={(e) =>
-                  setWorkspaceForm({ ...workspaceForm, slug: e.target.value })
+                  setWorkspaceForm({ ...workspaceForm, reason: e.target.value })
                 }
               />
-              <select
-                value={workspaceForm.type}
-                onChange={(e) =>
-                  setWorkspaceForm({ ...workspaceForm, type: e.target.value })
-                }
-              >
-                {(types.data ?? []).map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <input
-              placeholder="Mô tả"
-              value={workspaceForm.description}
-              onChange={(e) =>
-                setWorkspaceForm({
-                  ...workspaceForm,
-                  description: e.target.value,
-                })
-              }
-            />
-            <textarea
-              placeholder="Lý do xin tạo"
-              value={workspaceForm.reason}
-              onChange={(e) =>
-                setWorkspaceForm({ ...workspaceForm, reason: e.target.value })
-              }
-            />
-            <button className="primary" disabled={act.busy}>
-              Gửi admin duyệt
-            </button>
-          </form>
-        )}
-      </section>
+              <button className="primary" disabled={act.busy}>
+                Gửi admin duyệt
+              </button>
+            </form>
+          )}
+        </section>
+      )}
       {!list.data ? (
         <Loading />
       ) : list.data.length === 0 ? (
-        <p className="muted">Chưa có workspace nào. Liên hệ admin để tạo.</p>
+        <p className="muted">
+          {canCreateDirectly
+            ? "Chưa có workspace nào. Hãy tạo workspace đầu tiên."
+            : "Chưa có workspace nào để tham gia. Bạn có thể xin tạo workspace mới ở trên."}
+        </p>
       ) : (
         <div className="grid">
           {list.data.map((w) => {

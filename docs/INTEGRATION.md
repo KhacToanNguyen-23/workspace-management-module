@@ -4,7 +4,7 @@
 
 Java backend dùng Firebase Admin SDK để đọc và ghi Cloud Firestore. Web chỉ gọi API `/api`; không kết nối Firestore trực tiếp. Firestore Security Rules mặc định chặn toàn bộ client access.
 
-Các collection: `users`, `workspaceTypes`, `workspaces`, `workspaceSlugs`, `memberships`, `workspaceRequests`, `downloadRequests`, `auditLog`. Tên field dùng camelCase. Xem mô hình đầy đủ trong [plan roles redesign](../plans/roles-redesign.md).
+Các collection: `users`, `workspaceTypes`, `workspaces`, `memberships`, `workspaceRequests`, `downloadRequests`, `auditLog`. Tên field dùng camelCase. Xem mô hình đầy đủ trong [plan roles redesign](../plans/roles-redesign.md).
 
 Trong local, chạy `npm run db:up` để bật Firestore emulator tại `localhost:8085`. Backend dùng `FIRESTORE_EMULATOR_HOST=localhost:8085`; production cấu hình `FIRESTORE_PROJECT_ID` và Application Default Credentials hoặc `GOOGLE_APPLICATION_CREDENTIALS`. Triển khai index từ `firestore.indexes.json`.
 
@@ -52,7 +52,7 @@ Các route (ngoài `/health`) yêu cầu `Authorization: Bearer <Firebase ID tok
 | POST | `/api/admin/users/sync` | Đồng bộ directory. |
 | POST | `/api/admin/users/{email}/refresh` | Làm mới một user từ directory. |
 | GET | `/api/admin/workspace-requests?status=pending` | Hàng đợi yêu cầu tạo workspace. |
-| POST | `/api/admin/workspace-requests/{id}/approve` | Duyệt, có thể chỉnh tên, slug, type và description. |
+| POST | `/api/admin/workspace-requests/{id}/approve` | Duyệt, có thể chỉnh tên, type và description. |
 | POST | `/api/admin/workspace-requests/{id}/reject` | Từ chối với ghi chú. |
 | GET / POST | `/api/admin/workspaces` | Danh sách / tạo workspace. |
 | PATCH | `/api/admin/workspaces/{id}` | Đổi tên, mô tả hoặc trạng thái. |

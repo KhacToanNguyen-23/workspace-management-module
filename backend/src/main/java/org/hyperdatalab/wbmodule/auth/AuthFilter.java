@@ -38,6 +38,8 @@ public class AuthFilter extends OncePerRequestFilter {
         String path = req.getRequestURI();
         return !path.startsWith("/api/")
                 || path.equals("/api/health")
+                // Dev-only helpers; the controller exists only with app.auth.mode=dev.
+                || path.startsWith("/api/dev/")
                 || "OPTIONS".equals(req.getMethod());
     }
 

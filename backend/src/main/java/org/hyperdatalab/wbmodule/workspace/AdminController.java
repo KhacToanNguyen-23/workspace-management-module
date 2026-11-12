@@ -250,7 +250,6 @@ public class AdminController {
 
     record WorkspaceCreate(
             @NotBlank @Size(max = 120) String name,
-            @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{1,48}") String slug,
             @NotBlank String type,
             @Size(max = 1000) String description,
             List<@Email String> managers) {}
@@ -268,16 +267,13 @@ public class AdminController {
                                 .distinct()
                                 .toList();
         String wid =
-                workspaces.create(
-                        u, b.name(), b.slug(), b.type(), b.description(), managers.get(0));
+                workspaces.create(u, b.name(), b.type(), b.description(), managers.get(0));
         for (int i = 1; i < managers.size(); i++) addManagerInternal(u, wid, managers.get(i));
         return ResponseEntity.status(201)
                 .body(
                         Map.of(
                                 "id",
                                 wid,
-                                "slug",
-                                b.slug(),
                                 "name",
                                 b.name(),
                                 "type",
@@ -397,7 +393,6 @@ public class AdminController {
     record RequestDecision(
             @Size(max = 500) String note,
             String name,
-            String slug,
             String type,
             String description) {}
 
@@ -440,13 +435,12 @@ public class AdminController {
                     if (user != null && user.disabled())
                         throw ApiException.conflict("inactive_user", "Requester is disabled.");
                     String name = b != null && b.name() != null ? b.name() : request.name(),
-                            slug = b != null && b.slug() != null ? b.slug() : request.slug(),
                             type = b != null && b.type() != null ? b.type() : request.type(),
                             desc =
                                     b != null && b.description() != null
                                             ? b.description()
                                             : request.description();
-                    String wid = workspaces.create(tx, u, name, slug, type, desc, email);
+                    String wid = workspaces.create(tx, u, name, type, desc, email);
                     workspaceRequests.decide(
                             tx,
                             id,

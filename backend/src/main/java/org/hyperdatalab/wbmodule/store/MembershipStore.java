@@ -41,19 +41,19 @@ public class MembershipStore {
         DocumentSnapshot snapshot =
                 FirestoreStore.await(transaction.get(firestore.doc("memberships", id)));
         return snapshot.exists()
-                ? Optional.of(membership(id, FirestoreStore.data(snapshot)))
+                ? Optional.of(membership(id, FirestoreStore.raw(snapshot)))
                 : Optional.empty();
     }
 
     public List<Membership> byWorkspace(String workspaceId) {
         return firestore.equal("memberships", "workspaceId", workspaceId).stream()
-                .map(snapshot -> membership(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> membership(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 
     public List<Membership> byUser(String email) {
         return firestore.equal("memberships", "userEmail", email).stream()
-                .map(snapshot -> membership(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> membership(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 

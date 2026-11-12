@@ -37,13 +37,13 @@ public class DownloadRequestStore {
         DocumentSnapshot snapshot =
                 FirestoreStore.await(transaction.get(firestore.doc("downloadRequests", id)));
         return snapshot.exists()
-                ? Optional.of(request(id, FirestoreStore.data(snapshot)))
+                ? Optional.of(request(id, FirestoreStore.raw(snapshot)))
                 : Optional.empty();
     }
 
     public List<DownloadRequest> byWorkspace(String workspaceId) {
         return firestore.equal("downloadRequests", "workspaceId", workspaceId).stream()
-                .map(snapshot -> request(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> request(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 

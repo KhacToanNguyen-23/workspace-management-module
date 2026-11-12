@@ -4,7 +4,6 @@ import com.google.cloud.Timestamp;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import org.hyperdatalab.wbmodule.auth.AuthedUser;
@@ -252,7 +251,6 @@ public class MeController {
 
     record DirectWorkspaceBody(
             @NotBlank @Size(max = 120) String name,
-            @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{1,48}") String slug,
             @NotBlank String type,
             @Size(max = 1000) String description) {}
 
@@ -262,8 +260,8 @@ public class MeController {
             AuthedUser u, @Valid @RequestBody DirectWorkspaceBody b) {
         if (!u.workspaceManager())
             throw ApiException.forbidden("manager_only", "Workspace managers only.");
-        String id = workspaces.create(u, b.name(), b.slug(), b.type(), b.description(), u.email());
+        String id = workspaces.create(u, b.name(), b.type(), b.description(), u.email());
         return ResponseEntity.status(201)
-                .body(Map.of("id", id, "name", b.name(), "slug", b.slug(), "type", b.type()));
+                .body(Map.of("id", id, "name", b.name(), "type", b.type()));
     }
 }

@@ -20,8 +20,7 @@ import {
  * Local development ("dev"): the token is simply `dev:<email>`; the backend must run AUTH_MODE=dev.
  */
 export const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE ?? "dev") as
-  | "dev"
-  | "firebase";
+  "dev" | "firebase";
 export const ORG_DOMAIN = import.meta.env.VITE_ORG_DOMAIN ?? "hyperdatalab.org";
 
 export function isOrgEmail(email: string | null | undefined): boolean {
@@ -52,6 +51,20 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 const DEV_KEY = "wb-module-dev-email";
+
+/**
+ * Dev mode only: sign in as another address and reload, so every cached query (profile,
+ * memberships, queues) is fetched again for the new account.
+ */
+export function switchDevAccount(email: string) {
+  if (AUTH_MODE !== "dev") return;
+  try {
+    localStorage.setItem(DEV_KEY, email.trim().toLowerCase());
+  } catch {
+    /* storage blocked: the reload lands on the login screen */
+  }
+  window.location.assign("/");
+}
 
 async function loadFirebase() {
   const [{ initializeApp, getApps }, authModule] = await Promise.all([

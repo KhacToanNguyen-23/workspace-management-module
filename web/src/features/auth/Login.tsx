@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { AUTH_MODE, ORG_DOMAIN, useAuth } from "./auth";
+import { DevAccountList } from "./DevAccounts";
 
 export function LoginPage() {
   const { session, ready, error, signInGoogle, signInDev } = useAuth();
-  const [email, setEmail] = useState(`admin@${ORG_DOMAIN}`);
+  const [email, setEmail] = useState("");
   const from = (useLocation().state as { from?: string } | null)?.from;
   // Only same-site paths are accepted as a return target (no open redirect).
   const target =
@@ -28,25 +29,30 @@ export function LoginPage() {
             Đăng nhập với Google
           </button>
         ) : (
-          <form
-            className="stack"
-            onSubmit={(e) => {
-              e.preventDefault();
-              signInDev(email);
-            }}
-          >
-            <div className="notice">
-              Chế độ dev: nhập email để giả lập đăng nhập (backend phải chạy
-              AUTH_MODE=dev).
-            </div>
-            <label className="field">
-              <span>Email</span>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            <button className="primary wide" type="submit">
-              Đăng nhập (dev)
-            </button>
-          </form>
+          <>
+            <DevAccountList />
+            <form
+              className="stack"
+              onSubmit={(e) => {
+                e.preventDefault();
+                signInDev(email);
+              }}
+            >
+              <label className="field">
+                <span>
+                  Hoặc nhập email @{ORG_DOMAIN} bất kỳ (tạo member mới)
+                </span>
+                <input
+                  value={email}
+                  placeholder={`ten@${ORG_DOMAIN}`}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+              <button className="primary wide" type="submit">
+                Đăng nhập (dev)
+              </button>
+            </form>
+          </>
         )}
         {error && <div className="error">{error}</div>}
       </div>

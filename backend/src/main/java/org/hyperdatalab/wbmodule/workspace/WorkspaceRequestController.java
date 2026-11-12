@@ -4,7 +4,6 @@ import com.google.cloud.Timestamp;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import org.hyperdatalab.wbmodule.auth.AuthedUser;
@@ -48,12 +47,11 @@ public class WorkspaceRequestController {
 
     record Body(
             @NotBlank @Size(max = 120) String name,
-            @NotBlank @Pattern(regexp = "[a-z0-9][a-z0-9-]{1,48}") String slug,
             @NotBlank String type,
             @Size(max = 1000) String description,
             @Size(max = 1000) String reason) {}
 
-    /** Creates a request if its requester and slug have no pending conflicts. */
+    /** Creates a request if its requester has no other pending request. */
     @PostMapping
     ResponseEntity<Map<String, Object>> create(AuthedUser user, @Valid @RequestBody Body body) {
         return firestore.transaction(
@@ -70,17 +68,6 @@ public class WorkspaceRequestController {
                             .exists()) {
                         throw ApiException.unprocessable("unknown_type", "Unknown workspace type.");
                     }
-                    boolean pendingSlug =
-                            requests.byStatus("pending").stream()
-                                    .anyMatch(request -> request.slug().equals(body.slug()));
-                    if (FirestoreStore.await(
-                                            transaction.get(
-                                                    firestore.doc("workspaceSlugs", body.slug())))
-                                    .exists()
-                            || pendingSlug) {
-                        throw ApiException.conflict(
-                                "duplicate", "Slug is already in use or pending.");
-                    }
 
                     String id =
                             firestore
@@ -94,7 +81,6 @@ public class WorkspaceRequestController {
                                     id,
                                     user.email(),
                                     body.name().trim(),
-                                    body.slug(),
                                     body.type(),
                                     body.description(),
                                     body.reason(),
@@ -112,7 +98,7 @@ public class WorkspaceRequestController {
                             "workspace_request.create",
                             id,
                             null,
-                            Map.of("slug", body.slug()));
+                            Map.of("name", body.name().trim()));
                     return ResponseEntity.status(201).body(Map.of("id", id, "status", "pending"));
                 });
     }

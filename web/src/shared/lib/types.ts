@@ -9,7 +9,6 @@ export interface WorkspaceRequest {
   department?: string | null;
   role?: GlobalRole;
   name: string;
-  slug: string;
   type: string;
   description: string;
   reason: string;
@@ -59,7 +58,6 @@ export interface Me {
     workspace: {
       id: string;
       name: string;
-      slug: string;
       type: string;
       status: string;
     };
@@ -74,7 +72,6 @@ export interface Me {
 }
 export interface WorkspaceSummary {
   id: string;
-  slug: string;
   name: string;
   type: string;
   description: string;
@@ -87,7 +84,6 @@ export interface WorkspaceInfo {
   workspace: {
     id: string;
     name: string;
-    slug: string;
     type: string;
     description: string;
     status: string;
