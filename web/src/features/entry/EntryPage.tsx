@@ -104,7 +104,7 @@ export function EntryPage() {
               src="/assets/app-preview.webp"
               alt={t.previewAlt}
               width={1440}
-              height={900}
+              height={620}
               loading="lazy"
               className="h-auto w-full rounded-md border bg-muted"
             />

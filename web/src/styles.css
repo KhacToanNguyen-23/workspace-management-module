@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* The app has a light theme only; dark: classes apply only under an explicit .dark parent. */
+@custom-variant dark (&:is(.dark *));
+
 /*
  * HyperSpace tokens. Colours keep the HyperData tone (blue #0071bc, navy text);
  * layout is flat: thin borders, no default shadows, 6px radius.

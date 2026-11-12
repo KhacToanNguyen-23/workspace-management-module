@@ -72,7 +72,7 @@ export function AdminPage() {
             <TabsTrigger
               key={t.value}
               value={t.value}
-              className="flex-none px-0 text-[13px]"
+              className="flex-none px-0 text-[13px] after:bg-primary group-data-[orientation=horizontal]/tabs:after:bottom-0"
             >
               {t.label}
             </TabsTrigger>

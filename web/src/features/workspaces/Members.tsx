@@ -125,7 +125,7 @@ export function MembersPage() {
       />
       <PageBody>
         <ErrorBox error={act.error ?? members.error} />
-        <Section title="Chờ duyệt" count={pending.length}>
+        <Section title="Chờ duyệt" count={members.data ? pending.length : undefined}>
           {!members.data ? (
             <Loading />
           ) : (
@@ -184,7 +184,7 @@ export function MembersPage() {
           )}
         </Section>
 
-        <Section title="Thành viên" count={approved.length}>
+        <Section title="Thành viên" count={members.data ? approved.length : undefined}>
           {/* The add form lives in the toolbar on wider screens. */}
           <form
             className="flex gap-2 py-3 sm:hidden"
