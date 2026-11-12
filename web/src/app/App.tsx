@@ -14,6 +14,7 @@ import {
   Check,
   ChevronsUpDown,
   FileDown,
+  Layers,
   LayoutList,
   LogOut,
   Plus,
@@ -45,6 +46,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -142,11 +145,20 @@ function Home() {
   return <Navigate to="/onboarding" replace />;
 }
 
+/** The shadcn sidebar keeps its state in a cookie; read it so a reload keeps the same width. */
+function readSidebarOpen() {
+  try {
+    return !/(?:^|; )sidebar_state=false/.test(document.cookie);
+  } catch {
+    return true;
+  }
+}
+
 // ---- shell -----------------------------------------------------------------------------
 function Shell() {
   return (
     <TooltipProvider delayDuration={300}>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={readSidebarOpen()}>
         <AppSidebar />
         <SidebarInset className="min-w-0">
           <Outlet />
@@ -172,14 +184,19 @@ function NavItem({
   const active = !!matchPath({ path: to, end: end ?? false }, pathname);
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={active}>
+      <SidebarMenuButton
+        asChild
+        isActive={active}
+        tooltip={label}
+        className="data-[active=true]:bg-(--sidebar-active)"
+      >
         <NavLink
           to={to}
           end={end}
           onClick={() => isMobile && setOpenMobile(false)}
-          className="text-[13px] text-sidebar-foreground! no-underline! hover:text-sidebar-accent-foreground!"
+          className="text-[13px] text-sidebar-foreground"
         >
-          <Icon className="text-muted-foreground" />
+          <Icon className="text-sidebar-foreground/60 [[data-active=true]_&]:text-sky-300" />
           <span>{label}</span>
         </NavLink>
       </SidebarMenuButton>
@@ -195,25 +212,28 @@ function AppSidebar() {
     (me.user.isAdmin ||
       !!me.memberships.find((m) => m.workspace.id === wid)?.canManage);
   return (
-    <Sidebar>
-      <SidebarHeader className="gap-3 border-b px-3 py-3">
-        <div className="flex items-center gap-2 px-1">
-          <HyperSpaceMark />
-          <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-tight text-foreground">
-              HyperSpace
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              HyperData Lab
+    <Sidebar collapsible="icon" className="border-sidebar-border">
+      <SidebarHeader className="gap-3 border-b border-sidebar-border px-2 py-3">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col">
+          <div className="flex min-w-0 items-center gap-2 px-1 group-data-[collapsible=icon]:px-0">
+            <HyperSpaceMark className="size-7 shrink-0" />
+            <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
+              <div className="truncate text-sm font-semibold tracking-tight text-white">
+                HyperSpace
+              </div>
+              <div className="truncate text-[11px] text-sidebar-foreground/60">
+                HyperData Lab
+              </div>
             </div>
           </div>
+          <SidebarTrigger className="size-7 shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white" />
         </div>
         <WorkspaceSwitcher />
       </SidebarHeader>
-      <SidebarContent className="gap-0 py-2">
+      <SidebarContent className="gap-0 overflow-x-hidden py-2">
         {wid && (
           <SidebarGroup className="py-1">
-            <SidebarGroupLabel className="h-7 text-[11px]">
+            <SidebarGroupLabel className="h-7 text-[11px] text-sidebar-foreground/50">
               Workspace
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -241,7 +261,9 @@ function AppSidebar() {
           </SidebarGroup>
         )}
         <SidebarGroup className="py-1">
-          <SidebarGroupLabel className="h-7 text-[11px]">Chung</SidebarGroupLabel>
+          <SidebarGroupLabel className="h-7 text-[11px] text-sidebar-foreground/50">
+            Chung
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <NavItem
@@ -267,9 +289,10 @@ function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t p-2">
+      <SidebarFooter className="border-t border-sidebar-border p-2">
         <UserMenu />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
@@ -280,31 +303,35 @@ function WorkspaceSwitcher() {
   const navigate = useNavigate();
   const approved = me.memberships.filter((m) => m.status === "approved");
   const current = approved.find((m) => m.workspace.id === wid);
+  const name = current?.workspace.name ?? "Chọn workspace";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="outline"
-          size="sm"
-          className="h-9 w-full justify-between px-2.5 font-normal"
-          aria-label="Chọn workspace"
+          variant="ghost"
+          aria-label={`Chọn workspace (đang chọn: ${name})`}
+          className="h-9 w-full justify-between border border-sidebar-border bg-sidebar-accent/50 px-2.5 font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-white group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
         >
-          <span className="min-w-0 text-left leading-tight">
-            <span className="block truncate text-[13px] font-medium">
-              {current?.workspace.name ?? "Chọn workspace"}
-            </span>
+          <span className="min-w-0 truncate text-[13px] font-medium group-data-[collapsible=icon]:hidden">
+            {name}
           </span>
-          <span className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className="hidden text-xs font-semibold group-data-[collapsible=icon]:block"
+          >
+            {current ? name.slice(0, 1).toUpperCase() : <Layers className="size-4" />}
+          </span>
+          <span className="flex items-center gap-1.5 group-data-[collapsible=icon]:hidden">
             {current && (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[11px] text-sidebar-foreground/60">
                 {current.workspace.type}
               </span>
             )}
-            <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+            <ChevronsUpDown className="size-3.5 text-sidebar-foreground/60" />
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-(--radix-dropdown-menu-trigger-width)">
+      <DropdownMenuContent align="start" className="min-w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
           Workspace của tôi
         </DropdownMenuLabel>
@@ -347,22 +374,26 @@ function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <SidebarMenuButton size="lg" className="h-11 gap-2.5 px-2">
-          <Avatar className="size-7 rounded-md">
+        <SidebarMenuButton
+          size="lg"
+          tooltip={user.name || user.email}
+          className="gap-2.5 px-2 data-[state=open]:bg-sidebar-accent"
+        >
+          <Avatar className="size-7 shrink-0 rounded-md">
             {user.photoUrl && <AvatarImage src={user.photoUrl} alt="" />}
-            <AvatarFallback className="rounded-md bg-accent text-[11px] font-semibold text-accent-foreground">
+            <AvatarFallback className="rounded-md bg-sidebar-active text-[11px] font-semibold text-white">
               {initials(user.name, user.email)}
             </AvatarFallback>
           </Avatar>
           <span className="grid min-w-0 flex-1 leading-tight">
-            <span className="truncate text-[13px] font-medium text-foreground">
+            <span className="truncate text-[13px] font-medium text-white">
               {user.name || user.email}
             </span>
-            <span className="truncate text-[11px] text-muted-foreground">
+            <span className="truncate text-[11px] text-sidebar-foreground/60">
               {GLOBAL_ROLE_LABEL[user.role]}
             </span>
           </span>
-          <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+          <ChevronsUpDown className="size-3.5 text-sidebar-foreground/60" />
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-56">
