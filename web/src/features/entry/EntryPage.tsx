@@ -22,7 +22,7 @@ export function EntryPage() {
   return (
     <div className="min-h-svh bg-background">
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
-        <nav className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-4 md:px-8 xl:px-12">
+        <nav className="flex h-16 w-full items-center justify-between gap-3 px-4 md:px-8">
           <Link
             to="/"
             className="flex items-center gap-2 text-foreground! no-underline!"
