@@ -98,22 +98,6 @@ export function EntryPage() {
           />
         </section>
 
-        <section className="mx-auto max-w-[1440px] px-4 md:px-8 xl:px-12">
-          <figure>
-            <img
-              src="/assets/app-preview.webp"
-              alt={t.previewAlt}
-              width={1440}
-              height={620}
-              loading="lazy"
-              className="h-auto w-full rounded-md border bg-muted"
-            />
-            <figcaption className="mt-3 text-center text-xs text-muted-foreground">
-              {t.previewCaption}
-            </figcaption>
-          </figure>
-        </section>
-
         <section
           id="capabilities"
           className="mx-auto max-w-[1440px] scroll-mt-20 px-4 py-16 md:px-8 xl:px-12 md:py-20"

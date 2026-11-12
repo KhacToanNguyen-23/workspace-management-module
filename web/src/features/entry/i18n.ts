@@ -14,9 +14,6 @@ const dict = {
     headline2: "Nghĩ xa hơn mọi giới hạn.",
     description:
       "Gom nghiên cứu, tài liệu và cộng sự của bạn vào một không gian làm việc có tổ chức.",
-    previewAlt:
-      "Ảnh chụp HyperSpace: hàng đợi yêu cầu download của một workspace",
-    previewCaption: "Hàng đợi yêu cầu download trong một workspace nghiên cứu.",
     capabilitiesTitle: "Những gì HyperSpace hỗ trợ",
     cap1Title: "Workspace nghiên cứu",
     cap1Body:
@@ -48,8 +45,6 @@ const dict = {
     headline2: "Think beyond boundaries.",
     description:
       "Bring your research, documents, and collaborators into one organized workspace.",
-    previewAlt: "HyperSpace screenshot: a workspace's download request queue",
-    previewCaption: "The download request queue of a research workspace.",
     capabilitiesTitle: "What HyperSpace supports",
     cap1Title: "Research Workspaces",
     cap1Body:
