@@ -240,9 +240,9 @@ function AppSidebar() {
       !!me.memberships.find((m) => m.workspace.id === wid)?.canManage);
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">
-      <SidebarHeader className="gap-3 border-b border-sidebar-border px-2 py-3">
-        <div className="flex items-center">
-          <div className="flex min-w-0 items-center gap-2 px-1 group-data-[collapsible=icon]:px-0">
+      <SidebarHeader className="h-14 shrink-0 justify-center gap-0 border-b border-sidebar-border bg-sidebar-header px-2 py-0">
+        <div className="flex items-center group-data-[collapsible=icon]:justify-center">
+          <div className="flex min-w-0 items-center gap-2.5 px-1 group-data-[collapsible=icon]:px-0">
             <HyperSpaceMark className="size-7 shrink-0" />
             <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
               <div className="truncate text-sm font-semibold tracking-tight text-white">
@@ -254,9 +254,11 @@ function AppSidebar() {
             </div>
           </div>
         </div>
-        <WorkspaceSwitcher />
       </SidebarHeader>
-      <SidebarContent className="gap-0 overflow-x-hidden py-2">
+      <SidebarContent className="gap-0 overflow-x-hidden pt-5 pb-2">
+        <SidebarGroup className="pt-0 pb-3">
+          <WorkspaceSwitcher />
+        </SidebarGroup>
         {wid && (
           <SidebarGroup className="py-1">
             <SidebarGroupLabel className="h-7 text-[11px] text-sidebar-foreground/50">
