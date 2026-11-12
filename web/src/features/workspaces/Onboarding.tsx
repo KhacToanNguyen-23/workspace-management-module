@@ -37,7 +37,7 @@ export function OnboardingPage() {
   const api = useApi();
   const navigate = useNavigate();
   const { me, reload: reloadMe } = useMe();
-  const list = useQuery<WorkspaceSummary[]>("/workspaces");
+  const list = useQuery<WorkspaceSummary[]>("/workspaces?limit=500");
   const act = useAction();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -161,7 +161,7 @@ export function OnboardingPage() {
                               .run(() =>
                                 api(
                                   "DELETE",
-                                  `/workspaces/${m.workspace.id}/join`,
+                                  `/workspaces/${m.workspace.id}/members/me`,
                                 ),
                               )
                               .then(refresh)
@@ -230,7 +230,7 @@ export function OnboardingPage() {
                           onClick={() =>
                             act
                               .run(() =>
-                                api("POST", `/workspaces/${w.id}/join`, {
+                                api("PUT", `/workspaces/${w.id}/members/me`, {
                                   note: notes[w.id] ?? "",
                                 }),
                               )

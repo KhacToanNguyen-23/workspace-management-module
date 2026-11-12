@@ -27,7 +27,9 @@ export function WorkspaceHomePage() {
   const { me } = useMe();
   const { hash } = useLocation();
   const wid = info.workspace.id;
-  const people = useQuery<Person[]>(`/w/${wid}/people`);
+  const people = useQuery<Person[]>(
+    `/workspaces/${wid}/members?status=approved&limit=500`,
+  );
 
   // Old links pointed at the download section of this page; it is its own page now.
   if (hash === "#downloads") return <Navigate to="downloads" replace />;

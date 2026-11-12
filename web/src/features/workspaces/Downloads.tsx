@@ -64,9 +64,11 @@ export function DownloadsPage() {
   const act = useAction();
   const { ask, dialog } = useAsk();
   const wid = info.workspace.id;
-  const mine = useQuery<DownloadRequest[]>(`/w/${wid}/download-requests/mine`);
+  const mine = useQuery<DownloadRequest[]>(
+    `/workspaces/${wid}/download-requests?requester=me&limit=500`,
+  );
   const queue = useQuery<DownloadRequest[]>(
-    info.canManage ? `/w/${wid}/download-requests` : null,
+    info.canManage ? `/workspaces/${wid}/download-requests?limit=500` : null,
   );
   const [paperRef, setPaperRef] = useState("");
   const [note, setNote] = useState("");
@@ -96,7 +98,8 @@ export function DownloadsPage() {
     if (decisionNote === null) return;
     void act
       .run(() =>
-        api("POST", `/w/${wid}/download-requests/${id}/${decision}`, {
+        api("PATCH", `/workspaces/${wid}/download-requests/${id}`, {
+          status: decision === "approve" ? "approved" : "rejected",
           note: decisionNote,
         }),
       )
@@ -104,7 +107,7 @@ export function DownloadsPage() {
   };
   const withdraw = (id: string) =>
     void act
-      .run(() => api("DELETE", `/w/${wid}/download-requests/${id}`))
+      .run(() => api("DELETE", `/workspaces/${wid}/download-requests/${id}`))
       .then(refresh);
 
   const myRows = (mine.data ?? []).filter((r) => matches(r, q, status));
@@ -165,7 +168,7 @@ export function DownloadsPage() {
               e.preventDefault();
               void act
                 .run(() =>
-                  api("POST", `/w/${wid}/download-requests`, { paperRef, note }),
+                  api("POST", `/workspaces/${wid}/download-requests`, { paperRef, note }),
                 )
                 .then((r) => {
                   if (r !== undefined) {

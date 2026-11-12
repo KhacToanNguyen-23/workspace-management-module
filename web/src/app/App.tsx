@@ -62,7 +62,8 @@ import { WorkspaceHomePage } from "../features/workspaces/WorkspaceHome";
 import { HyperSpaceMark } from "../shared/components/Brand";
 import { ErrorBox, Loading } from "../shared/components/ui";
 import { useQuery } from "../shared/lib/api";
-import type { Me, WorkspaceInfo } from "../shared/lib/types";
+import type { Me, WorkspaceView } from "../shared/lib/types";
+import { toWorkspaceInfo } from "../shared/lib/types";
 import { GLOBAL_ROLE_LABEL } from "../shared/lib/types";
 import { MeContext, WorkspaceContext, useMe } from "./contexts";
 
@@ -439,21 +440,23 @@ function UserMenu() {
 
 function WorkspaceRoute() {
   const { wid } = useParams();
-  const q = useQuery<WorkspaceInfo>(`/w/${wid}`);
+  const q = useQuery<WorkspaceView>(`/workspaces/${wid}`);
   if (q.error)
     return (
       <div className="p-8">
         <ErrorBox error={q.error} />
       </div>
     );
-  if (!q.data || q.data.workspace.id !== wid)
+  if (!q.data || q.data.id !== wid)
     return (
       <div className="p-8">
         <Loading />
       </div>
     );
   return (
-    <WorkspaceContext.Provider value={{ value: q.data, reload: q.reload }}>
+    <WorkspaceContext.Provider
+      value={{ value: toWorkspaceInfo(q.data), reload: q.reload }}
+    >
       <Outlet />
     </WorkspaceContext.Provider>
   );

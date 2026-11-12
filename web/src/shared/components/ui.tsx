@@ -190,6 +190,22 @@ export function EmptyRow({
   );
 }
 
+/** Shown under a paged list when the server holds more rows than were loaded. */
+export function TruncationNote({
+  shown,
+  total,
+}: {
+  shown: number | undefined;
+  total: number | null;
+}) {
+  if (shown === undefined || total === null || total <= shown) return null;
+  return (
+    <p className="py-2 text-xs text-muted-foreground">
+      Hiển thị {shown}/{total} dòng. Thu hẹp bộ lọc để xem phần còn lại.
+    </p>
+  );
+}
+
 /** Empty state outside a table: one muted line. */
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="py-3 text-[13px] text-muted-foreground">{children}</p>;

@@ -31,6 +31,7 @@ import {
   SelectField,
   Stacked,
   Tag,
+  TruncationNote,
   fmtShort,
   useAction,
   useAsk,
@@ -113,11 +114,12 @@ function UsersTab() {
   if (q) params.set("q", q);
   if (role) params.set("role", role);
   if (disabled) params.set("disabled", disabled);
-  const users = useQuery<AdminUser[]>(`/admin/users?${params}`);
+  params.set("limit", "500");
+  const users = useQuery<AdminUser[]>(`/users?${params}`);
   const patch = (email: string, body: object) =>
     void act
       .run(() =>
-        api("PATCH", `/admin/users/${encodeURIComponent(email)}`, body),
+        api("PATCH", `/users/${encodeURIComponent(email)}`, body),
       )
       .then(users.reload);
   return (
@@ -249,6 +251,7 @@ function UsersTab() {
           </Table>
         )}
       </div>
+      <TruncationNote shown={users.data?.length} total={users.total} />
       {dialog}
     </>
   );
@@ -259,7 +262,7 @@ function RequestsTab() {
     act = useAction(),
     { ask, dialog } = useAsk();
   const q = useQuery<WorkspaceRequest[]>(
-    "/admin/workspace-requests?status=pending",
+    "/workspace-requests?status=pending&limit=500",
   );
   const [edits, setEdits] = useState<Record<string, { name: string }>>({});
   const refresh = () => q.reload();
@@ -273,8 +276,9 @@ function RequestsTab() {
     if (note === null) return;
     void act
       .run(() =>
-        api("POST", `/admin/workspace-requests/${r.id}/approve`, {
+        api("PATCH", `/workspace-requests/${r.id}`, {
           ...e,
+          status: "approved",
           note,
         }),
       )
@@ -290,7 +294,7 @@ function RequestsTab() {
     if (note === null) return;
     void act
       .run(() =>
-        api("POST", `/admin/workspace-requests/${r.id}/reject`, { note }),
+        api("PATCH", `/workspace-requests/${r.id}`, { status: "rejected", note }),
       )
       .then(refresh);
   };
@@ -391,8 +395,7 @@ interface AdminWorkspace {
   name: string;
   type: string;
   status: string;
-  /** The admin API returns the manager list under this name. */
-  managerEmails?: string[];
+  managers?: string[];
   memberCount: number;
   pendingCount: number;
 }
@@ -401,8 +404,8 @@ function WorkspacesTab() {
   const api = useApi(),
     act = useAction(),
     { ask, dialog } = useAsk();
-  const list = useQuery<AdminWorkspace[]>("/admin/workspaces");
-  const users = useQuery<AdminUser[]>("/admin/users?disabled=false");
+  const list = useQuery<AdminWorkspace[]>("/workspaces?status=all&limit=500");
+  const users = useQuery<AdminUser[]>("/users?disabled=false&limit=500");
   const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
   const [managerSelections, setManagerSelections] = useState<
     Record<string, string>
@@ -432,7 +435,7 @@ function WorkspacesTab() {
       .run(() =>
         api<{ promoted: boolean }>(
           "POST",
-          `/admin/workspaces/${w.id}/managers`,
+          `/workspaces/${w.id}/managers`,
           { email },
         ),
       )
@@ -458,7 +461,7 @@ function WorkspacesTab() {
             e.preventDefault();
             void act
               .run(() =>
-                api("POST", "/admin/workspaces", {
+                api("POST", "/workspaces", {
                   ...form,
                   managers: form.managers.split(/[\s,;]+/).filter(Boolean),
                 }),
@@ -544,7 +547,7 @@ function WorkspacesTab() {
                     <Stacked primary={w.name} secondary={w.type} />
                   </TableCell>
                   <TableCell className="max-w-56 truncate text-[13px] text-muted-foreground">
-                    {(w.managerEmails ?? []).join(", ") || "—"}
+                    {(w.managers ?? []).join(", ") || "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -560,7 +563,7 @@ function WorkspacesTab() {
                           })
                         }
                         options={(users.data ?? [])
-                          .filter((user) => !w.managerEmails?.includes(user.email))
+                          .filter((user) => !w.managers?.includes(user.email))
                           .map((user) => ({
                             value: user.email,
                             label: `${user.name || user.email} (${user.role})`,
@@ -594,7 +597,7 @@ function WorkspacesTab() {
                       onClick={() =>
                         void act
                           .run(() =>
-                            api("PATCH", `/admin/workspaces/${w.id}`, {
+                            api("PATCH", `/workspaces/${w.id}`, {
                               status:
                                 w.status === "active" ? "archived" : "active",
                             }),
@@ -617,13 +620,14 @@ function WorkspacesTab() {
 }
 
 function AuditTab() {
-  const q = useQuery<AuditRow[]>("/admin/audit?limit=300");
+  const q = useQuery<AuditRow[]>("/audit-events?limit=300");
   return (
     <>
       <ErrorBox error={q.error} />
       <div className="border-t">
         <AuditTable rows={q.data} />
       </div>
+      <TruncationNote shown={q.data?.length} total={q.total} />
     </>
   );
 }

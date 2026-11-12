@@ -45,8 +45,10 @@ export function MembersPage() {
   const api = useApi();
   const act = useAction();
   const { ask, dialog } = useAsk();
-  const members = useQuery<MemberRow[]>(`/w/${wid}/members`);
-  const audit = useQuery<AuditRow[]>(`/w/${wid}/audit?limit=50`);
+  const members = useQuery<MemberRow[]>(`/workspaces/${wid}/members?limit=500`);
+  const audit = useQuery<AuditRow[]>(
+    `/audit-events?workspaceId=${wid}&limit=50`,
+  );
   const [email, setEmail] = useState("");
   if (!info.canManage)
     return (
@@ -61,11 +63,13 @@ export function MembersPage() {
   };
   const decide = (
     id: string,
-    what: "approve" | "reject" | "revoke",
+    status: "approved" | "rejected" | "revoked",
     body: object = {},
   ) =>
     void act
-      .run(() => api("POST", `/w/${wid}/members/${id}/${what}`, body))
+      .run(() =>
+        api("PATCH", `/workspaces/${wid}/members/${id}`, { status, ...body }),
+      )
       .then(refresh);
   const reject = async (m: MemberRow) => {
     const note = await ask({
@@ -74,7 +78,7 @@ export function MembersPage() {
       confirmLabel: "Từ chối",
       destructive: true,
     });
-    if (note !== null) decide(m.id, "reject", { note });
+    if (note !== null) decide(m.id, "rejected", { note });
   };
   const revoke = async (m: MemberRow) => {
     const ok = await ask({
@@ -83,7 +87,7 @@ export function MembersPage() {
       confirmLabel: "Thu hồi",
       destructive: true,
     });
-    if (ok !== null) decide(m.id, "revoke");
+    if (ok !== null) decide(m.id, "revoked");
   };
   const rows = members.data ?? [];
   const pending = rows.filter((m) => m.status === "pending"),
@@ -101,7 +105,7 @@ export function MembersPage() {
             onSubmit={(e) => {
               e.preventDefault();
               void act
-                .run(() => api("POST", `/w/${wid}/members`, { email }))
+                .run(() => api("POST", `/workspaces/${wid}/members`, { email }))
                 .then((r) => {
                   if (r !== undefined) setEmail("");
                   refresh();
@@ -163,7 +167,7 @@ export function MembersPage() {
                         <Button
                           size="sm"
                           disabled={act.busy}
-                          onClick={() => decide(m.id, "approve")}
+                          onClick={() => decide(m.id, "approved")}
                         >
                           Duyệt
                         </Button>
@@ -191,7 +195,7 @@ export function MembersPage() {
             onSubmit={(e) => {
               e.preventDefault();
               void act
-                .run(() => api("POST", `/w/${wid}/members`, { email }))
+                .run(() => api("POST", `/workspaces/${wid}/members`, { email }))
                 .then((r) => {
                   if (r !== undefined) setEmail("");
                   refresh();
