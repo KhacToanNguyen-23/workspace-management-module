@@ -63,10 +63,7 @@ export function AdminPage() {
     );
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-0">
-      <PageHeader
-        title="Quản trị"
-        sub="Người dùng, yêu cầu tạo workspace, workspace và nhật ký."
-      />
+      <PageHeader title="Quản trị" />
       <div className="overflow-x-auto border-b px-4 md:px-8">
         <TabsList variant="line" className="h-10 gap-4 p-0">
           {TABS.map((t) => (
