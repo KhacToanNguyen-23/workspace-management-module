@@ -246,19 +246,19 @@ function AppSidebar() {
       <SidebarHeader className="h-14 shrink-0 justify-center gap-0 border-b border-border bg-background px-2 py-0">
         <div className="flex items-center group-data-[collapsible=icon]:justify-center">
           <div className="flex min-w-0 items-center gap-2.5 px-1 group-data-[collapsible=icon]:px-0">
-            <HyperSpaceMark className="size-7 shrink-0" />
+            <HyperSpaceMark className="size-9 shrink-0 group-data-[collapsible=icon]:size-8" />
             <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
-              <div className="truncate text-sm font-semibold tracking-tight text-foreground">
+              <div className="truncate text-[17px] font-semibold tracking-tight text-foreground">
                 HyperSpace
               </div>
-              <div className="truncate text-[11px] text-muted-foreground">
+              <div className="truncate text-xs text-muted-foreground">
                 HyperData Lab
               </div>
             </div>
           </div>
         </div>
       </SidebarHeader>
-      <div className="flex min-h-0 flex-1 flex-col rounded-tr-[20px] bg-sidebar">
+      <div className="flex min-h-0 flex-1 flex-col rounded-tr-[32px] bg-sidebar">
       <SidebarContent className="gap-0 overflow-x-hidden pt-8 pb-2">
         <SidebarGroup className="pt-0 pb-3">
           <WorkspaceSwitcher />
@@ -301,11 +301,7 @@ function AppSidebar() {
               <NavItem
                 to="/onboarding"
                 icon={UserPlus}
-                label={
-                  me.user.role === "member"
-                    ? "Tham gia / xin tạo workspace"
-                    : "Tham gia workspace"
-                }
+                label="Tham gia workspace"
               />
               {me.user.role !== "member" && (
                 <NavItem
