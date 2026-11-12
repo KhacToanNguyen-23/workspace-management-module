@@ -12,6 +12,7 @@ import {
 } from "react-router-dom";
 import {
   Check,
+  ChevronLeft,
   ChevronsUpDown,
   FileDown,
   Layers,
@@ -24,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -46,8 +48,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarRail,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -204,6 +204,33 @@ function NavItem({
   );
 }
 
+/**
+ * Round button that straddles the sidebar's right edge, halfway down where no sidebar content sits
+ * in either width. Hidden on phones, where the sidebar is a drawer.
+ */
+function SidebarEdgeToggle() {
+  const { state, toggleSidebar } = useSidebar();
+  const collapsed = state === "collapsed";
+  const label = collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên";
+  return (
+    <button
+      type="button"
+      onClick={toggleSidebar}
+      aria-label={label}
+      title={`${label} (Ctrl+B)`}
+      className="absolute top-1/2 -right-3 z-30 -translate-y-1/2 hidden size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:flex"
+    >
+      <ChevronLeft
+        aria-hidden
+        className={cn(
+          "size-3.5 transition-transform duration-200",
+          collapsed && "rotate-180",
+        )}
+      />
+    </button>
+  );
+}
+
 function AppSidebar() {
   const { me } = useMe();
   const { wid } = useParams();
@@ -214,7 +241,7 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">
       <SidebarHeader className="gap-3 border-b border-sidebar-border px-2 py-3">
-        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:flex-col">
+        <div className="flex items-center">
           <div className="flex min-w-0 items-center gap-2 px-1 group-data-[collapsible=icon]:px-0">
             <HyperSpaceMark className="size-7 shrink-0" />
             <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
@@ -226,7 +253,6 @@ function AppSidebar() {
               </div>
             </div>
           </div>
-          <SidebarTrigger className="size-7 shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-white" />
         </div>
         <WorkspaceSwitcher />
       </SidebarHeader>
@@ -292,7 +318,7 @@ function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-2">
         <UserMenu />
       </SidebarFooter>
-      <SidebarRail />
+      <SidebarEdgeToggle />
     </Sidebar>
   );
 }
