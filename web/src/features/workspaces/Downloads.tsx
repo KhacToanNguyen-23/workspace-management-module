@@ -141,6 +141,20 @@ export function DownloadsPage() {
         }
       />
       <PageBody>
+        <div className="relative mb-6 sm:hidden">
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="search"
+            aria-label="Tìm yêu cầu"
+            placeholder="Tìm paper, người gửi…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="h-9 pl-8"
+          />
+        </div>
         <Section
           title="Gửi yêu cầu paper"
           description="Gửi DOI, URL hoặc tiêu đề để manager xem xét. Chức năng này không tạo file hay link tải."
