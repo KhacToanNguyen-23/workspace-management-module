@@ -38,7 +38,6 @@ public abstract class IntegrationTest {
                 java.util.List.of(
                         "users",
                         "workspaces",
-                        "workspaceSlugs",
                         "memberships",
                         "workspaceRequests",
                         "downloadRequests",
@@ -83,8 +82,6 @@ public abstract class IntegrationTest {
                         java.util.Map.of(
                                 "name",
                                 "Writing Lab " + type,
-                                "slug",
-                                "writing-lab-" + type,
                                 "type",
                                 type,
                                 "managers",

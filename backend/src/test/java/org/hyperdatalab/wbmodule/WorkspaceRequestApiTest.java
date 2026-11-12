@@ -7,17 +7,16 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 class WorkspaceRequestApiTest extends IntegrationTest {
-    private Map<String, Object> request(String slug) {
+    private Map<String, Object> request(String name) {
         return Map.of(
-                "name", "Alice Lab",
-                "slug", slug,
+                "name", name,
                 "type", "research",
                 "description", "work",
                 "reason", "study");
     }
 
-    private String requestId(String slug) throws Exception {
-        return call("POST", "/api/workspace-requests", ALICE, request(slug))
+    private String requestId(String name) throws Exception {
+        return call("POST", "/api/workspace-requests", ALICE, request(name))
                 .body()
                 .path("id")
                 .asText();
@@ -25,7 +24,7 @@ class WorkspaceRequestApiTest extends IntegrationTest {
 
     @Test
     void memberCanCreateWorkspaceRequest() throws Exception {
-        var response = call("POST", "/api/workspace-requests", ALICE, request("alice-lab"));
+        var response = call("POST", "/api/workspace-requests", ALICE, request("Alice Lab"));
 
         assertThat(response.status()).isEqualTo(201);
         assertThat(response.body().path("status").asText()).isEqualTo("pending");
@@ -33,25 +32,25 @@ class WorkspaceRequestApiTest extends IntegrationTest {
 
     @Test
     void memberCannotCreateTwoPendingRequests() throws Exception {
-        requestId("alice-lab");
+        requestId("Alice Lab");
 
-        assertThat(call("POST", "/api/workspace-requests", ALICE, request("alice-lab-2")).code())
+        assertThat(call("POST", "/api/workspace-requests", ALICE, request("Alice Lab 2")).code())
                 .isEqualTo("already_pending");
     }
 
     @Test
     void memberCanWithdrawPendingRequestAndRetry() throws Exception {
-        String id = requestId("alice-lab");
+        String id = requestId("Alice Lab");
 
         assertThat(call("DELETE", "/api/workspace-requests/" + id, ALICE, null).status())
                 .isEqualTo(204);
-        assertThat(call("POST", "/api/workspace-requests", ALICE, request("alice-lab-2")).status())
+        assertThat(call("POST", "/api/workspace-requests", ALICE, request("Alice Lab 2")).status())
                 .isEqualTo(201);
     }
 
     @Test
     void adminApprovalPromotesRequesterAndCreatesManagedWorkspace() throws Exception {
-        String id = requestId("alice-lab");
+        String id = requestId("Alice Lab");
         var response =
                 call("POST", "/api/admin/workspace-requests/" + id + "/approve", ADMIN, Map.of());
         var me = get("/api/me", ALICE).body();
@@ -59,13 +58,13 @@ class WorkspaceRequestApiTest extends IntegrationTest {
         assertThat(response.status()).isEqualTo(200);
         assertThat(me.path("user").path("role").asText()).isEqualTo("workspace_manager");
         assertThat(me.path("memberships").get(0).path("role").asText()).isEqualTo("manager");
-        assertThat(me.path("memberships").get(0).path("workspace").path("slug").asText())
-                .isEqualTo("alice-lab");
+        assertThat(me.path("memberships").get(0).path("workspace").path("name").asText())
+                .isEqualTo("Alice Lab");
     }
 
     @Test
     void adminCanRejectRequestWithoutCreatingWorkspace() throws Exception {
-        String id = requestId("alice-lab");
+        String id = requestId("Alice Lab");
         var response =
                 call(
                         "POST",
@@ -78,16 +77,16 @@ class WorkspaceRequestApiTest extends IntegrationTest {
     }
 
     @Test
-    void twoPendingRequestsCannotUseTheSameSlug() throws Exception {
-        requestId("alice-lab");
+    void requestWithoutNameIsRejected() throws Exception {
+        var response =
+                call("POST", "/api/workspace-requests", ALICE, Map.of("type", "research"));
 
-        assertThat(call("POST", "/api/workspace-requests", BOB, request("alice-lab")).code())
-                .isEqualTo("duplicate");
+        assertThat(response.status()).isEqualTo(422);
     }
 
     @Test
     void workspaceManagerCanCreateWorkspaceDirectly() throws Exception {
-        String requestId = requestId("alice-lab");
+        String requestId = requestId("Alice Lab");
         call("POST", "/api/admin/workspace-requests/" + requestId + "/approve", ADMIN, Map.of());
 
         assertThat(
@@ -97,7 +96,6 @@ class WorkspaceRequestApiTest extends IntegrationTest {
                                         ALICE,
                                         Map.of(
                                                 "name", "Second",
-                                                "slug", "alice-second",
                                                 "type", "review"))
                                 .status())
                 .isEqualTo(201);
@@ -112,7 +110,6 @@ class WorkspaceRequestApiTest extends IntegrationTest {
                                         BOB,
                                         Map.of(
                                                 "name", "No",
-                                                "slug", "no-workspace",
                                                 "type", "research"))
                                 .status())
                 .isEqualTo(403);
