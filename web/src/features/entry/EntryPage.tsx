@@ -22,7 +22,7 @@ export function EntryPage() {
   return (
     <div className="min-h-svh bg-background">
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
-        <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 md:px-8">
+        <nav className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-3 px-4 md:px-8 xl:px-12">
           <Link
             to="/"
             className="flex items-center gap-2 text-foreground! no-underline!"
@@ -57,7 +57,7 @@ export function EntryPage() {
       </header>
 
       <main>
-        <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 md:grid-cols-[1.05fr_1fr] md:px-8 md:py-20">
+        <section className="mx-auto grid max-w-[1440px] items-center gap-10 px-4 py-14 md:grid-cols-[1.05fr_1fr] md:px-8 xl:px-12 md:py-20">
           <div>
             <p className="mb-4 text-xs font-medium tracking-wide text-primary uppercase">
               {t.eyebrow}
@@ -98,7 +98,7 @@ export function EntryPage() {
           />
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 md:px-8">
+        <section className="mx-auto max-w-[1440px] px-4 md:px-8 xl:px-12">
           <figure>
             <img
               src="/assets/app-preview.webp"
@@ -116,7 +116,7 @@ export function EntryPage() {
 
         <section
           id="capabilities"
-          className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 md:px-8 md:py-20"
+          className="mx-auto max-w-[1440px] scroll-mt-20 px-4 py-16 md:px-8 xl:px-12 md:py-20"
         >
           <h2 className="mb-8 text-sm font-semibold text-foreground">
             {t.capabilitiesTitle}
@@ -141,7 +141,7 @@ export function EntryPage() {
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between md:px-8">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-2 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between md:px-8 xl:px-12">
           <span className="flex items-center gap-2">
             <HyperSpaceMark className="size-5" />
             <span className="font-medium text-foreground">HyperSpace</span>
