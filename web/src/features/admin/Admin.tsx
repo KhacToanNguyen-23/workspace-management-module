@@ -391,7 +391,8 @@ interface AdminWorkspace {
   name: string;
   type: string;
   status: string;
-  managers?: string[];
+  /** The admin API returns the manager list under this name. */
+  managerEmails?: string[];
   memberCount: number;
   pendingCount: number;
 }
@@ -543,7 +544,7 @@ function WorkspacesTab() {
                     <Stacked primary={w.name} secondary={w.type} />
                   </TableCell>
                   <TableCell className="max-w-56 truncate text-[13px] text-muted-foreground">
-                    {(w.managers ?? []).join(", ") || "—"}
+                    {(w.managerEmails ?? []).join(", ") || "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -559,7 +560,7 @@ function WorkspacesTab() {
                           })
                         }
                         options={(users.data ?? [])
-                          .filter((user) => !w.managers?.includes(user.email))
+                          .filter((user) => !w.managerEmails?.includes(user.email))
                           .map((user) => ({
                             value: user.email,
                             label: `${user.name || user.email} (${user.role})`,

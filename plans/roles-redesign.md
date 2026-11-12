@@ -247,10 +247,10 @@ Sửa test cũ cho khớp (bỏ test về permissions toggle / viewer / đổi r
   - Sidebar hiện role hiện tại của user (badge) dưới tên.
   - Nav "Thành viên & quyền" → "Quản lý workspace", hiện khi `canManage`.
   - Thêm nav "Yêu cầu download" trong workspace (member: request của mình; manager: hàng đợi).
-  - `workspace_manager` có nav "Tạo workspace"; `member` có "Xin tạo workspace".
-  - `Home()`: giữ logic, nhưng `workspace_manager` chưa có workspace thì đi tới trang tạo workspace.
-- `pages/Onboarding.tsx`: giữ phần xin vào workspace; thêm card "Xin tạo workspace mới" (form name / type / description / reason; admin và workspace_manager thấy link tạo trực tiếp thay cho form) và trạng thái request hiện tại (pending → nút rút lại; rejected → hiện lý do + cho gửi lại).
-- **Mới** `pages/CreateWorkspace.tsx` cho `workspace_manager` (gọi `POST /api/workspaces`). Có thể tái dùng form trong Onboarding.
+  - Một nav "Tất cả workspace" cho mọi vai trò; việc tạo workspace nằm trên trang đó (xem `Onboarding.tsx`).
+  - `Home()`: giữ logic, nhưng `workspace_manager` chưa có workspace thì đi tới trang "Tất cả workspace".
+- `Onboarding.tsx` ("Tất cả workspace"): danh sách workspace để xin tham gia, bảng yêu cầu tham gia của tôi, trạng thái yêu cầu tạo workspace gần nhất (pending → nút rút lại; rejected → hiện lý do). Nút "Tạo workspace" trên thanh tiêu đề mở `CreateWorkspaceDialog`: admin và `workspace_manager` tạo ngay (`POST /api/workspaces`), member gửi yêu cầu (`POST /api/workspace-requests`, khoá nút khi đang có yêu cầu pending).
+- Không còn trang `CreateWorkspace` riêng; `/create-workspace` chuyển hướng sang `/onboarding`.
 - `pages/WorkspaceHome.tsx`: thêm form "Gửi yêu cầu download paper" (paperRef + note) và bảng request của tôi (status, ngày, ghi chú của manager, nút rút lại khi pending).
 - `pages/Members.tsx`: bỏ phần bật / tắt quyền và dropdown đổi role. Giữ hàng đợi xin vào + danh sách thành viên + thêm trực tiếp + thu hồi. Thêm tab "Yêu cầu download" (list + approve / reject có note).
 - `pages/Admin.tsx`: tab

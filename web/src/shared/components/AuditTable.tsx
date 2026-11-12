@@ -24,8 +24,8 @@ export function AuditTable({ rows }: { rows: AuditRow[] | null }) {
       </TableHeader>
       <TableBody>
         {rows.length === 0 && <EmptyRow colSpan={5}>Chưa có nhật ký.</EmptyRow>}
-        {rows.map((r) => (
-          <TableRow key={r.id}>
+        {rows.map((r, i) => (
+          <TableRow key={r.id ?? `${r.at}-${i}`}>
             <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
               {fmtShort(r.at)}
             </TableCell>
