@@ -1,33 +1,49 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { useMe } from "../../app/contexts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Badge,
+  Empty,
   ErrorBox,
   Loading,
+  PageBody,
   PageHeader,
-  fmtDate,
+  Section,
+  Tag,
+  fmtShort,
   useAction,
 } from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
 import { ROLE_LABEL, type WorkspaceSummary } from "../../shared/lib/types";
+import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog";
 
-/** Pick a workspace and send a join request; a manager of that workspace must approve it. */
+/**
+ * All workspaces in one place: join an existing one (a manager of that workspace approves it) or
+ * create a new one. Admins and workspace managers create directly; members send a request that an
+ * admin approves.
+ */
 export function OnboardingPage() {
   const api = useApi();
+  const navigate = useNavigate();
   const { me, reload: reloadMe } = useMe();
-  const list = useQuery<WorkspaceSummary[]>("/workspaces");
+  const list = useQuery<WorkspaceSummary[]>("/workspaces?limit=500");
   const act = useAction();
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [workspaceForm, setWorkspaceForm] = useState({
-    name: "",
-    slug: "",
-    type: "research",
-    description: "",
-    reason: "",
-  });
-  const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
-  const approved = me.memberships.some((m) => m.status === "approved");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const canCreateDirectly = me.user.role !== "member";
+  const request = me.workspaceRequest;
+  const requestPending = request?.status === "pending";
 
   const refresh = () => {
     list.reload();
@@ -35,233 +51,209 @@ export function OnboardingPage() {
   };
 
   return (
-    <div>
+    <>
       <PageHeader
-        title="Tham gia workspace"
-        sub={
-          approved
-            ? "Bạn có thể xin vào thêm workspace khác."
-            : "Bạn chưa thuộc workspace nào. Chọn một workspace và gửi yêu cầu; manager của workspace đó sẽ duyệt."
+        title="Workspace"
+        actions={
+          <Button
+            size="sm"
+            disabled={!canCreateDirectly && requestPending}
+            title={
+              !canCreateDirectly && requestPending
+                ? "Bạn đang có một yêu cầu chờ duyệt"
+                : undefined
+            }
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus />
+            {canCreateDirectly ? "Tạo workspace" : "Xin tạo workspace"}
+          </Button>
         }
       />
-      {me.memberships.length > 0 && (
-        <section className="card">
-          <h3>Yêu cầu của tôi</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Workspace</th>
-                <th>Vai trò</th>
-                <th>Trạng thái</th>
-                <th>Gửi lúc</th>
-                <th>Ghi chú duyệt</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {me.memberships.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    {m.status === "approved" ? (
-                      <Link to={`/w/${m.workspace.id}`}>
-                        {m.workspace.name}
-                      </Link>
-                    ) : (
-                      m.workspace.name
-                    )}
-                  </td>
-                  <td>{ROLE_LABEL[m.role]}</td>
-                  <td>
-                    <Badge value={m.status} />
-                  </td>
-                  <td>{fmtDate(m.requestedAt)}</td>
-                  <td className="muted">{m.decisionNote || "—"}</td>
-                  <td>
-                    {m.status === "pending" && (
-                      <button
-                        className="link"
-                        disabled={act.busy}
-                        onClick={() =>
-                          act
-                            .run(() =>
-                              api(
-                                "DELETE",
-                                `/workspaces/${m.workspace.id}/join`,
-                              ),
-                            )
-                            .then(refresh)
-                        }
-                      >
-                        Rút yêu cầu
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+      <PageBody>
+        <ErrorBox error={act.error ?? list.error} />
 
-      <ErrorBox error={act.error ?? list.error} />
-      <section className="card">
-        <h3>Xin tạo workspace mới</h3>
-        {me.workspaceRequest && (
-          <p>
-            Yêu cầu gần nhất: <Badge value={me.workspaceRequest.status} />{" "}
-            {me.workspaceRequest.name}{" "}
-            {me.workspaceRequest.decisionNote &&
-              `· ${me.workspaceRequest.decisionNote}`}
-            {me.workspaceRequest.status === "pending" && (
-              <button
-                className="link"
-                onClick={() =>
-                  void act
-                    .run(() =>
-                      api(
-                        "DELETE",
-                        `/workspace-requests/${me.workspaceRequest!.id}`,
-                      ),
-                    )
-                    .then(refresh)
-                }
-              >
-                Rút yêu cầu
-              </button>
-            )}
-          </p>
-        )}
-        {me.workspaceRequest?.status !== "pending" && (
-          <form
-            className="stack"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act
-                .run(() => api("POST", "/workspace-requests", workspaceForm))
-                .then(refresh);
-            }}
-          >
-            <div className="row wrap">
-              <input
-                placeholder="Tên workspace"
-                required
-                value={workspaceForm.name}
-                onChange={(e) =>
-                  setWorkspaceForm({
-                    ...workspaceForm,
-                    name: e.target.value,
-                    slug:
-                      workspaceForm.slug ||
-                      e.target.value
-                        .toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/^-|-$/g, ""),
-                  })
-                }
-              />
-              <input
-                placeholder="slug"
-                required
-                value={workspaceForm.slug}
-                onChange={(e) =>
-                  setWorkspaceForm({ ...workspaceForm, slug: e.target.value })
-                }
-              />
-              <select
-                value={workspaceForm.type}
-                onChange={(e) =>
-                  setWorkspaceForm({ ...workspaceForm, type: e.target.value })
-                }
-              >
-                {(types.data ?? []).map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+        {request && (
+          <Section title="Yêu cầu tạo workspace">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-[13px]">
+              <span className="font-medium">{request.name}</span>
+              <Tag>{request.type}</Tag>
+              <Badge value={request.status} />
+              {request.decisionNote && (
+                <span className="text-muted-foreground">
+                  {request.decisionNote}
+                </span>
+              )}
+              {requestPending && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                  disabled={act.busy}
+                  onClick={() =>
+                    void act
+                      .run(() =>
+                        api("DELETE", `/workspace-requests/${request.id}`),
+                      )
+                      .then(refresh)
+                  }
+                >
+                  Rút yêu cầu
+                </Button>
+              )}
             </div>
-            <input
-              placeholder="Mô tả"
-              value={workspaceForm.description}
-              onChange={(e) =>
-                setWorkspaceForm({
-                  ...workspaceForm,
-                  description: e.target.value,
-                })
-              }
-            />
-            <textarea
-              placeholder="Lý do xin tạo"
-              value={workspaceForm.reason}
-              onChange={(e) =>
-                setWorkspaceForm({ ...workspaceForm, reason: e.target.value })
-              }
-            />
-            <button className="primary" disabled={act.busy}>
-              Gửi admin duyệt
-            </button>
-          </form>
+          </Section>
         )}
-      </section>
-      {!list.data ? (
-        <Loading />
-      ) : list.data.length === 0 ? (
-        <p className="muted">Chưa có workspace nào. Liên hệ admin để tạo.</p>
-      ) : (
-        <div className="grid">
-          {list.data.map((w) => {
-            const canRequest =
-              !w.myStatus ||
-              w.myStatus === "rejected" ||
-              w.myStatus === "revoked";
-            return (
-              <article key={w.id} className="card">
-                <div className="row between">
-                  <h3>{w.name}</h3>
-                  <span className="tag">{w.type}</span>
-                </div>
-                <p className="muted">{w.description || "Không có mô tả."}</p>
-                <p className="small muted">
-                  {w.memberCount} thành viên · Quản lý:{" "}
-                  {w.managers.join(", ") || "chưa có"}
-                </p>
-                {w.myStatus && (
-                  <p>
-                    <Badge value={w.myStatus} />
-                  </p>
-                )}
-                {canRequest && (
-                  <div className="stack">
-                    <input
-                      placeholder="Lời nhắn cho manager (tuỳ chọn)"
-                      value={notes[w.id] ?? ""}
-                      onChange={(e) =>
-                        setNotes({ ...notes, [w.id]: e.target.value })
-                      }
-                    />
-                    <button
-                      className="primary"
-                      disabled={act.busy}
-                      onClick={() =>
-                        act
-                          .run(() =>
-                            api("POST", `/workspaces/${w.id}/join`, {
-                              note: notes[w.id] ?? "",
-                            }),
-                          )
-                          .then(refresh)
-                      }
-                    >
-                      Gửi yêu cầu tham gia
-                    </button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </div>
+
+        {me.memberships.length > 0 && (
+          <Section title="Yêu cầu tham gia của tôi" count={me.memberships.length}>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Workspace</TableHead>
+                  <TableHead className="w-28">Vai trò</TableHead>
+                  <TableHead className="w-28">Trạng thái</TableHead>
+                  <TableHead className="w-36">Gửi lúc</TableHead>
+                  <TableHead>Ghi chú duyệt</TableHead>
+                  <TableHead className="w-28">
+                    <span className="sr-only">Thao tác</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {me.memberships.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="font-medium">
+                      {m.status === "approved" ? (
+                        <Link to={`/w/${m.workspace.id}`}>
+                          {m.workspace.name}
+                        </Link>
+                      ) : (
+                        m.workspace.name
+                      )}
+                    </TableCell>
+                    <TableCell className="text-[13px]">
+                      {ROLE_LABEL[m.role]}
+                    </TableCell>
+                    <TableCell>
+                      <Badge value={m.status} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                      {fmtShort(m.requestedAt)}
+                    </TableCell>
+                    <TableCell className="text-[13px] text-muted-foreground">
+                      {m.decisionNote || "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {m.status === "pending" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={act.busy}
+                          onClick={() =>
+                            act
+                              .run(() =>
+                                api(
+                                  "DELETE",
+                                  `/workspaces/${m.workspace.id}/members/me`,
+                                ),
+                              )
+                              .then(refresh)
+                          }
+                        >
+                          Rút yêu cầu
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Section>
+        )}
+
+        <Section title="Tất cả workspace" count={list.data?.length}>
+          {!list.data ? (
+            <Loading />
+          ) : list.data.length === 0 ? (
+            <Empty>
+              {canCreateDirectly
+                ? "Chưa có workspace nào. Hãy tạo workspace đầu tiên."
+                : "Chưa có workspace nào để tham gia. Bạn có thể xin tạo workspace mới."}
+            </Empty>
+          ) : (
+            <ul className="divide-y">
+              {list.data.map((w) => {
+                const canRequest =
+                  !w.myStatus ||
+                  w.myStatus === "rejected" ||
+                  w.myStatus === "revoked";
+                return (
+                  <li
+                    key={w.id}
+                    className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">{w.name}</span>
+                        <Tag>{w.type}</Tag>
+                        {w.myStatus && <Badge value={w.myStatus} />}
+                      </div>
+                      <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                        {w.description || "Không có mô tả."}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {w.memberCount} thành viên · Quản lý:{" "}
+                        {w.managers.join(", ") || "chưa có"}
+                      </p>
+                    </div>
+                    {canRequest && (
+                      <div className="flex gap-2 lg:w-96">
+                        <Input
+                          aria-label={`Lời nhắn cho manager của ${w.name}`}
+                          placeholder="Lời nhắn cho manager (tuỳ chọn)"
+                          value={notes[w.id] ?? ""}
+                          onChange={(e) =>
+                            setNotes({ ...notes, [w.id]: e.target.value })
+                          }
+                          className="h-8 flex-1 text-[13px]"
+                        />
+                        <Button
+                          size="sm"
+                          disabled={act.busy}
+                          onClick={() =>
+                            act
+                              .run(() =>
+                                api("PUT", `/workspaces/${w.id}/members/me`, {
+                                  note: notes[w.id] ?? "",
+                                }),
+                              )
+                              .then(refresh)
+                          }
+                        >
+                          Xin tham gia
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+      </PageBody>
+
+      <CreateWorkspaceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        mode={canCreateDirectly ? "create" : "request"}
+        onDone={(id) => {
+          setDialogOpen(false);
+          reloadMe();
+          if (id) navigate(`/w/${id}`);
+          else refresh();
+        }}
+      />
+    </>
   );
 }

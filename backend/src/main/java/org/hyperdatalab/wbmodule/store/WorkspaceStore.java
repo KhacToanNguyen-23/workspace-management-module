@@ -18,7 +18,6 @@ public class WorkspaceStore {
 
     public record Workspace(
             String id,
-            String slug,
             String name,
             String type,
             String description,
@@ -43,19 +42,19 @@ public class WorkspaceStore {
         DocumentSnapshot snapshot =
                 FirestoreStore.await(transaction.get(firestore.doc("workspaces", id)));
         return snapshot.exists()
-                ? Optional.of(workspace(id, FirestoreStore.data(snapshot)))
+                ? Optional.of(workspace(id, FirestoreStore.raw(snapshot)))
                 : Optional.empty();
     }
 
     public List<Workspace> all() {
         return firestore.all("workspaces").stream()
-                .map(snapshot -> workspace(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> workspace(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 
     public List<Workspace> managedBy(String email) {
         return firestore.arrayContains("workspaces", "managerEmails", email).stream()
-                .map(snapshot -> workspace(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> workspace(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 
@@ -86,11 +85,6 @@ public class WorkspaceStore {
 
     public void create(Transaction transaction, Workspace workspace) {
         transaction.create(firestore.doc("workspaces", workspace.id()), data(workspace));
-    }
-
-    public void createSlug(Transaction transaction, String slug, String workspaceId) {
-        transaction.create(
-                firestore.doc("workspaceSlugs", slug), Map.of("workspaceId", workspaceId));
     }
 
     public void update(Transaction transaction, String id, Map<String, Object> fields) {
@@ -133,7 +127,6 @@ public class WorkspaceStore {
         Object managers = data.get("managerEmails");
         return new Workspace(
                 id,
-                text(data, "slug"),
                 text(data, "name"),
                 text(data, "type"),
                 text(data, "description"),
@@ -148,17 +141,18 @@ public class WorkspaceStore {
     }
 
     private static Map<String, Object> data(Workspace workspace) {
-        return Map.of(
-                "slug", workspace.slug(),
-                "name", workspace.name(),
-                "type", workspace.type(),
-                "description", workspace.description(),
-                "status", workspace.status(),
-                "createdBy", workspace.createdBy(),
-                "createdAt", workspace.createdAt(),
-                "managerEmails", workspace.managerEmails(),
-                "memberCount", workspace.memberCount(),
-                "pendingCount", workspace.pendingCount());
+        // A LinkedHashMap, not Map.of: records read from older documents may lack a field.
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("name", workspace.name());
+        data.put("type", workspace.type());
+        data.put("description", workspace.description() == null ? "" : workspace.description());
+        data.put("status", workspace.status());
+        data.put("createdBy", workspace.createdBy());
+        data.put("createdAt", workspace.createdAt());
+        data.put("managerEmails", workspace.managerEmails());
+        data.put("memberCount", workspace.memberCount());
+        data.put("pendingCount", workspace.pendingCount());
+        return data;
     }
 
     private static String text(Map<String, Object> data, String key) {

@@ -18,7 +18,6 @@ public class WorkspaceRequestStore {
             String id,
             String requester,
             String name,
-            String slug,
             String type,
             String description,
             String reason,
@@ -37,13 +36,13 @@ public class WorkspaceRequestStore {
 
     public List<WorkspaceRequest> byRequester(String email) {
         return firestore.equal("workspaceRequests", "requester", email).stream()
-                .map(snapshot -> request(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> request(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 
     public List<WorkspaceRequest> byStatus(String status) {
         return firestore.equal("workspaceRequests", "status", status).stream()
-                .map(snapshot -> request(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> request(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 
@@ -51,12 +50,12 @@ public class WorkspaceRequestStore {
         DocumentSnapshot snapshot =
                 FirestoreStore.await(transaction.get(firestore.doc("workspaceRequests", id)));
         return snapshot.exists()
-                ? Optional.of(request(id, FirestoreStore.data(snapshot)))
+                ? Optional.of(request(id, FirestoreStore.raw(snapshot)))
                 : Optional.empty();
     }
 
     public WorkspaceRequest from(DocumentSnapshot snapshot) {
-        return request(snapshot.getId(), FirestoreStore.data(snapshot));
+        return request(snapshot.getId(), FirestoreStore.raw(snapshot));
     }
 
     public void create(Transaction transaction, WorkspaceRequest request) {
@@ -103,7 +102,6 @@ public class WorkspaceRequestStore {
                 id,
                 text(data, "requester"),
                 text(data, "name"),
-                text(data, "slug"),
                 text(data, "type"),
                 text(data, "description"),
                 text(data, "reason"),
@@ -119,7 +117,6 @@ public class WorkspaceRequestStore {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("requester", request.requester());
         data.put("name", request.name());
-        data.put("slug", request.slug());
         data.put("type", request.type());
         data.put("description", request.description() == null ? "" : request.description());
         data.put("reason", request.reason() == null ? "" : request.reason());

@@ -8,8 +8,8 @@ import java.util.Map;
 
 class WorkspaceApiTest extends IntegrationTest {
     private String pendingMembership(String workspaceId, String email) throws Exception {
-        call("POST", "/api/workspaces/" + workspaceId + "/join", email, Map.of());
-        return get("/api/w/" + workspaceId + "/members?status=pending", MANAGER)
+        call("PUT", "/api/v1/workspaces/" + workspaceId + "/members/me", email, Map.of());
+        return get("/api/v1/workspaces/" + workspaceId + "/members?status=pending", MANAGER)
                 .body()
                 .get(0)
                 .path("id")
@@ -20,7 +20,7 @@ class WorkspaceApiTest extends IntegrationTest {
     void nonMemberCannotAccessWorkspace() throws Exception {
         String workspaceId = seedWorkspace("research");
 
-        assertThat(get("/api/w/" + workspaceId, ALICE).code()).isEqualTo("not_member");
+        assertThat(get("/api/v1/workspaces/" + workspaceId, ALICE).code()).isEqualTo("not_member");
     }
 
     @Test
@@ -28,9 +28,8 @@ class WorkspaceApiTest extends IntegrationTest {
         String workspaceId = seedWorkspace("research");
 
         assertThat(
-                        call(
-                                        "POST",
-                                        "/api/workspaces/" + workspaceId + "/join",
+                        call("PUT",
+                                        "/api/v1/workspaces/" + workspaceId + "/members/me",
                                         ALICE,
                                         Map.of("note", "hello"))
                                 .status())
@@ -43,18 +42,16 @@ class WorkspaceApiTest extends IntegrationTest {
         String membershipId = pendingMembership(workspaceId, ALICE);
 
         assertThat(
-                        call(
-                                        "POST",
-                                        "/api/w/"
+                        call("PATCH",
+                                        "/api/v1/workspaces/"
                                                 + workspaceId
                                                 + "/members/"
-                                                + membershipId
-                                                + "/approve",
+                                                + membershipId,
                                         MANAGER,
-                                        Map.of())
+                                        Map.of("status", "approved"))
                                 .status())
                 .isEqualTo(200);
-        assertThat(get("/api/w/" + workspaceId, ALICE).status()).isEqualTo(200);
+        assertThat(get("/api/v1/workspaces/" + workspaceId, ALICE).status()).isEqualTo(200);
     }
 
     @Test
@@ -63,18 +60,16 @@ class WorkspaceApiTest extends IntegrationTest {
         String membershipId = pendingMembership(workspaceId, ALICE);
 
         assertThat(
-                        call(
-                                        "POST",
-                                        "/api/w/"
+                        call("PATCH",
+                                        "/api/v1/workspaces/"
                                                 + workspaceId
                                                 + "/members/"
-                                                + membershipId
-                                                + "/reject",
+                                                + membershipId,
                                         MANAGER,
-                                        Map.of("note", "no"))
+                                        Map.of("status", "rejected", "note", "no"))
                                 .status())
                 .isEqualTo(200);
-        assertThat(get("/api/w/" + workspaceId, ALICE).code()).isEqualTo("not_member");
+        assertThat(get("/api/v1/workspaces/" + workspaceId, ALICE).code()).isEqualTo("not_member");
     }
 
     @Test
@@ -82,7 +77,7 @@ class WorkspaceApiTest extends IntegrationTest {
         String workspaceId = seedWorkspace("research");
         pendingMembership(workspaceId, ALICE);
 
-        assertThat(call("DELETE", "/api/workspaces/" + workspaceId + "/join", ALICE, null).status())
+        assertThat(call("DELETE", "/api/v1/workspaces/" + workspaceId + "/members/me", ALICE, null).status())
                 .isEqualTo(204);
     }
 
@@ -92,14 +87,14 @@ class WorkspaceApiTest extends IntegrationTest {
         var response =
                 call(
                         "POST",
-                        "/api/admin/workspaces/" + workspaceId + "/managers",
+                        "/api/v1/workspaces/" + workspaceId + "/managers",
                         ADMIN,
                         Map.of("email", ALICE));
 
         assertThat(response.body().path("promoted").asBoolean()).isTrue();
-        assertThat(get("/api/me", ALICE).body().path("user").path("role").asText())
+        assertThat(get("/api/v1/me", ALICE).body().path("user").path("role").asText())
                 .isEqualTo("workspace_manager");
-        assertThat(get("/api/admin/audit", ADMIN).body().findValuesAsText("action"))
+        assertThat(get("/api/v1/audit-events", ADMIN).body().findValuesAsText("action"))
                 .contains("user.role");
     }
 
@@ -109,15 +104,13 @@ class WorkspaceApiTest extends IntegrationTest {
         String membershipId = pendingMembership(otherWorkspaceId, BOB);
 
         assertThat(
-                        call(
-                                        "POST",
-                                        "/api/w/"
+                        call("PATCH",
+                                        "/api/v1/workspaces/"
                                                 + otherWorkspaceId
                                                 + "/members/"
-                                                + membershipId
-                                                + "/approve",
+                                                + membershipId,
                                         ALICE,
-                                        Map.of())
+                                        Map.of("status", "approved"))
                                 .status())
                 .isEqualTo(403);
     }

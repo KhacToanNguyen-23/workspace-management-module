@@ -34,12 +34,28 @@ Cần Java 17, Maven, Node 20+ và Docker.
 
 ```bash
 npm install
-npm run db:up          # Firestore emulator tại localhost:8085
-npm run dev:backend    # http://localhost:8080
-npm run dev:web        # http://localhost:5174
+npm run dev            # emulator + backend (8080) + web (5174) trong một lệnh
 ```
 
-Local mặc định dùng `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`. Đăng nhập bằng email trong `backend/src/test/resources/application-test.yml` hoặc địa chỉ org bất kỳ khi mock user list rỗng.
+Hoặc chạy riêng từng phần: `npm run db:up` (Firestore emulator tại localhost:8085), `npm run dev:backend`, `npm run dev:web`.
+
+Local mặc định dùng `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`: mọi địa chỉ `@hyperdatalab.org` đều đăng nhập được.
+
+### Tài khoản mẫu (chỉ có ở dev)
+
+Khi backend chạy với `AUTH_MODE=dev`, lúc khởi động nó tạo sẵn dữ liệu mẫu (chỉ tạo bản ghi còn thiếu, không ghi đè). Màn đăng nhập liệt kê các tài khoản này, bấm là vào; trong app có ô **Đổi tài khoản (dev)** ở cuối sidebar để chuyển nhanh.
+
+| Tài khoản | Role | Trạng thái dùng để test |
+|---|---|---|
+| `admin@` | admin | Quản lý user, duyệt yêu cầu tạo workspace của Carol |
+| `manager@` | workspace_manager | Quản lý **Demo Lab**: 1 yêu cầu tham gia (Bob) và 1 yêu cầu download (Alice) đang chờ |
+| `alice@` | member | Thành viên đã duyệt của Demo Lab, gửi được yêu cầu download |
+| `bob@` | member | Đang chờ duyệt vào Demo Lab |
+| `carol@` | member | Đang chờ admin duyệt yêu cầu tạo workspace |
+| `dave@` | member | Member mới, chưa thuộc workspace nào |
+| `disabled@` | member | Bị disable, đăng nhập bị chặn `403 disabled` |
+
+Nút **Reset dữ liệu mẫu** ở màn đăng nhập (`POST /api/dev/reset`) xoá toàn bộ dữ liệu trong emulator rồi tạo lại như bảng trên. Đặt `DEV_SEED=false` nếu không muốn tự tạo dữ liệu mẫu. Các route `/api/dev/*` và dữ liệu mẫu không tồn tại khi `AUTH_MODE=firebase`.
 
 ## Kịch bản thử
 
@@ -52,7 +68,7 @@ Local mặc định dùng `AUTH_MODE=dev` và `DIRECTORY_MODE=mock`. Đăng nh�
 ## Test và kiểm tra frontend
 
 Integration test dùng Firestore emulator trong Docker Compose. Dữ liệu các collection nghiệp vụ được xoá trước mỗi test; workspace types được seed lại idempotent lúc ứng dụng khởi động.
-Backend test suite hiện có 38 test, gồm kiểm thử API trên emulator và unit test.
+Backend test suite hiện có 94 test, gồm kiểm thử API trên emulator và unit test.
 
 ```bash
 npm run db:up

@@ -70,6 +70,15 @@ public class FirestoreStore {
         }
     }
 
+    /**
+     * The document's fields as stored (timestamps stay {@link com.google.cloud.Timestamp}). Stores
+     * map records from this; use {@link #data} only to build a JSON response.
+     */
+    public static Map<String, Object> raw(DocumentSnapshot snapshot) {
+        Map<String, Object> fields = snapshot.getData();
+        return fields == null ? new LinkedHashMap<>() : new LinkedHashMap<>(fields);
+    }
+
     public static Map<String, Object> data(DocumentSnapshot s) {
         Map<String, Object> out = new LinkedHashMap<>();
         if (s.getData() != null) s.getData().forEach((k, v) -> out.put(k, jsonValue(v)));

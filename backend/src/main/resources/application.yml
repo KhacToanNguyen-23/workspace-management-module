@@ -16,6 +16,8 @@ app:
     emulator-host: ${FIRESTORE_EMULATOR_HOST:}
     credentials-file: ${GOOGLE_APPLICATION_CREDENTIALS:}
   org-domain: hyperdatalab.org
+  # Seeds demo accounts/workspace at startup. Only has an effect when auth.mode is dev.
+  dev-seed: ${DEV_SEED:true}
   admin-email: admin@hyperdatalab.org
   auth:
     # firebase (production) | dev (local only: Bearer dev:<email>)
