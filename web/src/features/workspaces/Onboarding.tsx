@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { useMe } from "../../app/contexts";
 import { Button } from "@/components/ui/button";
@@ -12,43 +12,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Badge,
   Empty,
   ErrorBox,
-  Field,
   Loading,
   PageBody,
   PageHeader,
   Section,
-  SelectField,
   Tag,
   fmtShort,
   useAction,
 } from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
 import { ROLE_LABEL, type WorkspaceSummary } from "../../shared/lib/types";
+import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog";
 
 /**
- * Pick a workspace and send a join request (a manager of that workspace approves it), or ask an
- * admin to create a new workspace. Workspace managers and admins create workspaces directly.
+ * All workspaces in one place: join an existing one (a manager of that workspace approves it) or
+ * create a new one. Admins and workspace managers create directly; members send a request that an
+ * admin approves.
  */
 export function OnboardingPage() {
   const api = useApi();
+  const navigate = useNavigate();
   const { me, reload: reloadMe } = useMe();
   const list = useQuery<WorkspaceSummary[]>("/workspaces");
   const act = useAction();
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [workspaceForm, setWorkspaceForm] = useState({
-    name: "",
-    type: "research",
-    description: "",
-    reason: "",
-  });
-  const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const approved = me.memberships.some((m) => m.status === "approved");
   const canCreateDirectly = me.user.role !== "member";
+  const request = me.workspaceRequest;
+  const requestPending = request?.status === "pending";
 
   const refresh = () => {
     list.reload();
@@ -58,28 +54,65 @@ export function OnboardingPage() {
   return (
     <>
       <PageHeader
-        title="Tham gia workspace"
+        title="Workspace"
         sub={
           approved
-            ? "Bạn có thể xin vào thêm workspace khác."
+            ? "Xin vào thêm workspace khác hoặc tạo workspace mới."
             : "Chọn một workspace và gửi yêu cầu; manager của workspace đó sẽ duyệt."
         }
         actions={
-          canCreateDirectly && (
-            <Button asChild size="sm" variant="outline">
-              <Link to="/create-workspace" className="no-underline!">
-                <Plus />
-                Tạo workspace
-              </Link>
-            </Button>
-          )
+          <Button
+            size="sm"
+            disabled={!canCreateDirectly && requestPending}
+            title={
+              !canCreateDirectly && requestPending
+                ? "Bạn đang có một yêu cầu chờ duyệt"
+                : undefined
+            }
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus />
+            {canCreateDirectly ? "Tạo workspace" : "Xin tạo workspace"}
+          </Button>
         }
       />
       <PageBody>
         <ErrorBox error={act.error ?? list.error} />
 
+        {request && (
+          <Section title="Yêu cầu tạo workspace">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-[13px]">
+              <span className="font-medium">{request.name}</span>
+              <Tag>{request.type}</Tag>
+              <Badge value={request.status} />
+              {request.decisionNote && (
+                <span className="text-muted-foreground">
+                  {request.decisionNote}
+                </span>
+              )}
+              {requestPending && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                  disabled={act.busy}
+                  onClick={() =>
+                    void act
+                      .run(() =>
+                        api("DELETE", `/workspace-requests/${request.id}`),
+                      )
+                      .then(refresh)
+                  }
+                >
+                  Rút yêu cầu
+                </Button>
+              )}
+            </div>
+          </Section>
+        )}
+
         {me.memberships.length > 0 && (
-          <Section title="Yêu cầu của tôi" count={me.memberships.length}>
+          <Section title="Yêu cầu tham gia của tôi" count={me.memberships.length}>
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -145,14 +178,14 @@ export function OnboardingPage() {
           </Section>
         )}
 
-        <Section title="Workspace" count={list.data?.length}>
+        <Section title="Tất cả workspace" count={list.data?.length}>
           {!list.data ? (
             <Loading />
           ) : list.data.length === 0 ? (
             <Empty>
               {canCreateDirectly
                 ? "Chưa có workspace nào. Hãy tạo workspace đầu tiên."
-                : "Chưa có workspace nào để tham gia. Bạn có thể xin tạo workspace mới ở dưới."}
+                : "Chưa có workspace nào để tham gia. Bạn có thể xin tạo workspace mới."}
             </Empty>
           ) : (
             <ul className="divide-y">
@@ -214,124 +247,19 @@ export function OnboardingPage() {
             </ul>
           )}
         </Section>
-
-        {canCreateDirectly ? (
-          <Section title="Tạo workspace mới">
-            <p className="py-3 text-[13px] text-muted-foreground">
-              Bạn có quyền quản lý workspace nên tạo được ngay, không cần admin
-              duyệt. <Link to="/create-workspace">Tạo workspace</Link>
-            </p>
-          </Section>
-        ) : (
-          <Section
-            title="Xin tạo workspace mới"
-            description="Admin duyệt xong, bạn sẽ trở thành quản lý của workspace đó."
-          >
-            {me.workspaceRequest && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-3 text-[13px]">
-                <span className="text-muted-foreground">Yêu cầu gần nhất</span>
-                <span className="font-medium">{me.workspaceRequest.name}</span>
-                <Badge value={me.workspaceRequest.status} />
-                {me.workspaceRequest.decisionNote && (
-                  <span className="text-muted-foreground">
-                    {me.workspaceRequest.decisionNote}
-                  </span>
-                )}
-                {me.workspaceRequest.status === "pending" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto"
-                    disabled={act.busy}
-                    onClick={() =>
-                      void act
-                        .run(() =>
-                          api(
-                            "DELETE",
-                            `/workspace-requests/${me.workspaceRequest!.id}`,
-                          ),
-                        )
-                        .then(refresh)
-                    }
-                  >
-                    Rút yêu cầu
-                  </Button>
-                )}
-              </div>
-            )}
-            {me.workspaceRequest?.status !== "pending" && (
-              <form
-                className="grid max-w-2xl gap-3 pt-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void act
-                    .run(() => api("POST", "/workspace-requests", workspaceForm))
-                    .then(refresh);
-                }}
-              >
-                <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
-                  <Field label="Tên workspace" htmlFor="wr-name">
-                    <Input
-                      id="wr-name"
-                      required
-                      value={workspaceForm.name}
-                      onChange={(e) =>
-                        setWorkspaceForm({
-                          ...workspaceForm,
-                          name: e.target.value,
-                        })
-                      }
-                    />
-                  </Field>
-                  <Field label="Loại" htmlFor="wr-type">
-                    <SelectField
-                      id="wr-type"
-                      size="default"
-                      className="w-full"
-                      value={workspaceForm.type}
-                      onChange={(type) =>
-                        setWorkspaceForm({ ...workspaceForm, type })
-                      }
-                      options={(types.data ?? []).map((t) => ({
-                        value: t.code,
-                        label: t.name,
-                      }))}
-                    />
-                  </Field>
-                </div>
-                <Field label="Mô tả" htmlFor="wr-desc">
-                  <Input
-                    id="wr-desc"
-                    value={workspaceForm.description}
-                    onChange={(e) =>
-                      setWorkspaceForm({
-                        ...workspaceForm,
-                        description: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="Lý do xin tạo" htmlFor="wr-reason">
-                  <Textarea
-                    id="wr-reason"
-                    rows={3}
-                    value={workspaceForm.reason}
-                    onChange={(e) =>
-                      setWorkspaceForm({
-                        ...workspaceForm,
-                        reason: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-                <div>
-                  <Button disabled={act.busy}>Gửi admin duyệt</Button>
-                </div>
-              </form>
-            )}
-          </Section>
-        )}
       </PageBody>
+
+      <CreateWorkspaceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        mode={canCreateDirectly ? "create" : "request"}
+        onDone={(id) => {
+          setDialogOpen(false);
+          reloadMe();
+          if (id) navigate(`/w/${id}`);
+          else refresh();
+        }}
+      />
     </>
   );
 }

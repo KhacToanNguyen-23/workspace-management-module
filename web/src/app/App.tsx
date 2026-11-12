@@ -18,7 +18,6 @@ import {
   Layers,
   LayoutList,
   LogOut,
-  Plus,
   Shield,
   UserPlus,
   Users,
@@ -56,7 +55,6 @@ import { LoginPage } from "../features/auth/Login";
 import { AUTH_MODE, useAuth } from "../features/auth/auth";
 import { DevAccountMenu } from "../features/auth/DevAccounts";
 import { EntryPage } from "../features/entry/EntryPage";
-import { CreateWorkspacePage } from "../features/workspaces/CreateWorkspace";
 import { DownloadsPage } from "../features/workspaces/Downloads";
 import { MembersPage } from "../features/workspaces/Members";
 import { OnboardingPage } from "../features/workspaces/Onboarding";
@@ -141,7 +139,7 @@ function Home() {
   if (first) return <Navigate to={`/w/${first.workspace.id}`} replace />;
   if (me.user.isAdmin) return <Navigate to="/admin" replace />;
   if (me.user.role === "workspace_manager")
-    return <Navigate to="/create-workspace" replace />;
+    return <Navigate to="/onboarding" replace />;
   return <Navigate to="/onboarding" replace />;
 }
 
@@ -298,18 +296,7 @@ function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <NavItem
-                to="/onboarding"
-                icon={UserPlus}
-                label="Tham gia workspace"
-              />
-              {me.user.role !== "member" && (
-                <NavItem
-                  to="/create-workspace"
-                  icon={Plus}
-                  label="Tạo workspace"
-                />
-              )}
+              <NavItem to="/onboarding" icon={UserPlus} label="Tất cả workspace" />
               {me.user.isAdmin && (
                 <NavItem to="/admin" icon={Shield} label="Quản trị" />
               )}
@@ -480,7 +467,7 @@ export function App() {
       <Route element={<AppGate />}>
         <Route index element={<Home />} />
         <Route path="onboarding" element={<OnboardingPage />} />
-        <Route path="create-workspace" element={<CreateWorkspacePage />} />
+        <Route path="create-workspace" element={<Navigate to="/onboarding" replace />} />
         <Route path="admin" element={<AdminPage />} />
         <Route path="w/:wid" element={<WorkspaceRoute />}>
           <Route index element={<WorkspaceHomePage />} />
