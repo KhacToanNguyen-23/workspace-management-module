@@ -1,4 +1,4 @@
-package org.hyperdatalab.wbmodule.workspace;
+package org.hyperdatalab.wbmodule.workspace.request;
 
 import com.google.cloud.Timestamp;
 

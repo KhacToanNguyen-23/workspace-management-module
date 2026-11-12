@@ -63,7 +63,7 @@ Các route (ngoài `/health`) yêu cầu `Authorization: Bearer <Firebase ID tok
 ## Ghép backend
 
 1. Cấu hình service account và Firestore project của Writing Bank.
-2. Chép `auth/`, `config/`, `directory/`, `identity/`, `store/`, `workspace/` và `common/` hoặc chạy module này như một service riêng.
+2. Chạy module này như một service riêng; nếu tích hợp mã nguồn, giữ các package `admin/`, `auth/`, `common/`, `config/`, `directory/`, `identity/`, `store/` và `workspace/` cùng các package con.
 3. Gọi API từ frontend; không tạo Firestore client phía web. Chuyển Firebase ID token vào header `Authorization`.
 4. Tính năng nội dung thuộc workspace cần kiểm tra membership đã duyệt và `canManage`/role phù hợp ở backend.
 

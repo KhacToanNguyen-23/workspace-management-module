@@ -9,3 +9,22 @@ dist/
 coverage/
 target/
 data/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE metadata
+.idea/
+
+# Local logs
+*.log
+
+# Local credentials and private keys
+serviceAccount*.json
+*-service-account.json
+firebase-adminsdk-*.json
+*.pem
+*.p12
+*.key

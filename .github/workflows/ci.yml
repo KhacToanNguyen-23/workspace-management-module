@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".dockerignore"
+      - "backend/**"
+      - "web/**"
+      - "docker-compose.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "firestore.indexes.json"
+      - "firestore.rules"
+  pull_request:
+    # Run CI for every pull request, regardless of which files changed.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests and image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Start Firestore emulator
+        run: |
+          docker run --detach --rm --name firestore-emulator \
+            --publish 8085:8085 \
+            gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators \
+            gcloud emulators firestore start --host-port=0.0.0.0:8085
+          for attempt in $(seq 1 30); do
+            if curl --silent --output /dev/null http://127.0.0.1:8085; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs firestore-emulator
+          exit 1
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          FIRESTORE_EMULATOR_HOST: localhost:8085
+        run: mvn -B verify
+
+      - name: Build backend Docker image
+        run: docker build --file backend/Dockerfile --tag wb-module-backend:ci backend
+
+  frontend:
+    name: Frontend checks and image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build frontend Docker image
+        run: docker build --file web/Dockerfile --tag wb-module-web:ci .
