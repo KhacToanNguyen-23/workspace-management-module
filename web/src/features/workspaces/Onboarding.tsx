@@ -41,7 +41,6 @@ export function OnboardingPage() {
   const act = useAction();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
-  const approved = me.memberships.some((m) => m.status === "approved");
   const canCreateDirectly = me.user.role !== "member";
   const request = me.workspaceRequest;
   const requestPending = request?.status === "pending";
@@ -55,11 +54,6 @@ export function OnboardingPage() {
     <>
       <PageHeader
         title="Workspace"
-        sub={
-          approved
-            ? undefined
-            : "Chọn một workspace và gửi yêu cầu; manager của workspace đó sẽ duyệt."
-        }
         actions={
           <Button
             size="sm"
