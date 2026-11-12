@@ -28,6 +28,9 @@ import java.util.Optional;
 public class IdentityService {
     private static final Logger log = LoggerFactory.getLogger(IdentityService.class);
 
+    /** How often a user's {@code lastSeen} is written back while they keep calling the API. */
+    private static final Duration LAST_SEEN_WRITE_INTERVAL = Duration.ofMinutes(5);
+
     public record UserRow(
             String email,
             String authUid,
@@ -137,6 +140,16 @@ public class IdentityService {
         vals.put("directoryStatus", status);
         vals.put("lastSeen", Timestamp.now());
         if (check) vals.put("syncedAt", Timestamp.now());
+        // Reads should not turn into a write: keep the stored profile when it is recent enough.
+        boolean fresh =
+                prior.isPresent()
+                        && !check
+                        && prior.get().lastSeen() != null
+                        && prior.get()
+                                .lastSeen()
+                                .isAfter(OffsetDateTime.now().minus(LAST_SEEN_WRITE_INTERVAL))
+                        && (!forced || "admin".equals(prior.get().globalRole()));
+        if (!fresh)
         users.transaction(
                 tx -> {
                     UserStore.User existing = users.find(tx, email).orElse(null);
@@ -158,7 +171,7 @@ public class IdentityService {
                         audit.log(tx, email, "user.first_sign_in", email, null, Map.of());
                     return null;
                 });
-        UserRow saved = find(email).orElseThrow();
+        UserRow saved = fresh ? prior.get() : find(email).orElseThrow();
         if (status.equals("missing"))
             throw ApiException.forbidden(
                     "not_in_directory",

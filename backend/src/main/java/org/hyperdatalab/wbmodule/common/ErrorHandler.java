@@ -50,7 +50,8 @@ public class ErrorHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ResponseEntity<Object> badParam(MethodArgumentTypeMismatchException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body("not_found", "Not found."));
+        return ResponseEntity.badRequest()
+                .body(body("bad_parameter", "Invalid value for \"" + e.getName() + "\"."));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

@@ -4,16 +4,20 @@ import com.google.cloud.Timestamp;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import org.hyperdatalab.wbmodule.auth.AuthedUser;
 import org.hyperdatalab.wbmodule.common.ApiException;
+import org.hyperdatalab.wbmodule.common.Locations;
+import org.hyperdatalab.wbmodule.common.Paging;
 import org.hyperdatalab.wbmodule.identity.AuditService;
 import org.hyperdatalab.wbmodule.store.DownloadRequestStore;
 import org.hyperdatalab.wbmodule.store.FirestoreStore;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,9 +29,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-/** Member and manager endpoints for paper download requests. */
+/** Paper download requests of one workspace (a status record only; no file is ever served). */
 @RestController
-@RequestMapping("/api/w/{wid}/download-requests")
+@RequestMapping(Locations.API + "/workspaces/{wid}/download-requests")
 public class DownloadRequestController {
     private final FirestoreStore firestore;
     private final DownloadRequestStore requests;
@@ -47,7 +51,9 @@ public class DownloadRequestController {
 
     record Body(@NotBlank @Size(max = 500) String paperRef, @Size(max = 1000) String note) {}
 
-    record Decision(@Size(max = 500) String note) {}
+    record Patch(
+            @NotBlank @Pattern(regexp = "approved|rejected") String status,
+            @Size(max = 500) String note) {}
 
     /** Creates a pending request for a workspace member. */
     @PostMapping
@@ -80,31 +86,51 @@ public class DownloadRequestController {
                             Map.of("paperRef", body.paperRef()));
                     return null;
                 });
-        return ResponseEntity.status(201).body(Map.of("id", id, "status", "pending"));
+        return ResponseEntity.created(
+                        Locations.of("/workspaces/{wid}/download-requests/{id}", wid, id))
+                .body(Map.of("id", id, "status", "pending"));
     }
 
-    /** Lists all requests for managers; members can list only their own requests. */
+    /**
+     * Lists requests. Managers see all of them by default; {@code requester=me} (or being an
+     * ordinary member) narrows the list to the caller's own requests.
+     */
     @GetMapping
-    List<Map<String, Object>> list(
+    ResponseEntity<List<Map<String, Object>>> list(
             AuthedUser user,
             @PathVariable String wid,
-            @RequestParam(required = false) String status) {
-        access.load(user, wid).requireManager();
-        return requests.byWorkspace(wid).stream()
-                .filter(request -> status == null || status.equals(request.status()))
-                .sorted(Comparator.comparing(request -> "pending".equals(request.status()) ? 0 : 1))
-                .map(requests::asMap)
-                .toList();
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String requester,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        var a = access.load(user, wid);
+        if (requester != null && !requester.equals("me"))
+            throw ApiException.unprocessable("validation", "requester must be \"me\".");
+        boolean own = !a.canManage() || "me".equals(requester);
+        return Paging.page(
+                requests.byWorkspace(wid).stream()
+                        .filter(request -> status == null || status.equals(request.status()))
+                        .filter(request -> !own || user.email().equals(request.requester()))
+                        .sorted(
+                                Comparator.comparing(
+                                        request -> "pending".equals(request.status()) ? 0 : 1))
+                        .map(requests::asMap)
+                        .toList(),
+                limit,
+                offset);
     }
 
-    /** Lists the current member's requests in this workspace. */
-    @GetMapping("/mine")
-    List<Map<String, Object>> mine(AuthedUser user, @PathVariable String wid) {
-        access.load(user, wid);
-        return requests.byWorkspace(wid).stream()
-                .filter(request -> user.email().equals(request.requester()))
-                .map(requests::asMap)
-                .toList();
+    /** Returns one request (managers, or its requester). */
+    @GetMapping("/{id}")
+    Map<String, Object> get(AuthedUser user, @PathVariable String wid, @PathVariable String id) {
+        var a = access.load(user, wid);
+        DownloadRequestStore.DownloadRequest request =
+                requests.byWorkspace(wid).stream()
+                        .filter(candidate -> candidate.id().equals(id))
+                        .findFirst()
+                        .orElseThrow(() -> ApiException.notFound("Request not found."));
+        if (!a.canManage() && !user.email().equals(request.requester())) a.requireManager();
+        return requests.asMap(request);
     }
 
     /** Withdraws one of the current member's pending requests. */
@@ -138,10 +164,15 @@ public class DownloadRequestController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Approves or rejects a pending request without creating a download link. */
-    private Map<String, Object> decide(
-            AuthedUser user, String wid, String id, String status, Decision decision) {
+    /** Approves or rejects a pending request without creating a download link (managers). */
+    @PatchMapping("/{id}")
+    Map<String, Object> decide(
+            AuthedUser user,
+            @PathVariable String wid,
+            @PathVariable String id,
+            @Valid @RequestBody Patch body) {
         access.load(user, wid).requireManager();
+        String status = body.status();
         return firestore.transaction(
                 transaction -> {
                     DownloadRequestStore.DownloadRequest request =
@@ -159,7 +190,7 @@ public class DownloadRequestController {
                             status,
                             user.email(),
                             Timestamp.now(),
-                            decision == null || decision.note() == null ? "" : decision.note());
+                            body.note() == null ? "" : body.note());
                     audit.log(
                             transaction,
                             user.email(),
@@ -169,25 +200,5 @@ public class DownloadRequestController {
                             Map.of());
                     return Map.of("id", id, "status", status);
                 });
-    }
-
-    /** Approves a pending request. */
-    @PostMapping("/{id}/approve")
-    Map<String, Object> approve(
-            AuthedUser user,
-            @PathVariable String wid,
-            @PathVariable String id,
-            @RequestBody(required = false) Decision decision) {
-        return decide(user, wid, id, "approved", decision);
-    }
-
-    /** Rejects a pending request. */
-    @PostMapping("/{id}/reject")
-    Map<String, Object> reject(
-            AuthedUser user,
-            @PathVariable String wid,
-            @PathVariable String id,
-            @RequestBody(required = false) Decision decision) {
-        return decide(user, wid, id, "rejected", decision);
     }
 }
