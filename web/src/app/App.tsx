@@ -239,23 +239,23 @@ function AppSidebar() {
     (me.user.isAdmin ||
       !!me.memberships.find((m) => m.workspace.id === wid)?.canManage);
   return (
-    <Sidebar collapsible="icon" className="border-sidebar-border">
-      <SidebarHeader className="h-14 shrink-0 justify-center gap-0 border-b border-sidebar-border bg-sidebar-header px-2 py-0">
+    <Sidebar collapsible="icon" className="border-transparent">
+      <SidebarHeader className="h-14 shrink-0 justify-center gap-0 border-b border-border bg-background px-2 py-0">
         <div className="flex items-center group-data-[collapsible=icon]:justify-center">
           <div className="flex min-w-0 items-center gap-2.5 px-1 group-data-[collapsible=icon]:px-0">
             <HyperSpaceMark className="size-7 shrink-0" />
             <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
-              <div className="truncate text-sm font-semibold tracking-tight text-white">
+              <div className="truncate text-sm font-semibold tracking-tight text-foreground">
                 HyperSpace
               </div>
-              <div className="truncate text-[11px] text-sidebar-foreground/60">
+              <div className="truncate text-[11px] text-muted-foreground">
                 HyperData Lab
               </div>
             </div>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="gap-0 overflow-x-hidden pt-5 pb-2">
+      <SidebarContent className="gap-0 overflow-x-hidden pt-8 pb-2">
         <SidebarGroup className="pt-0 pb-3">
           <WorkspaceSwitcher />
         </SidebarGroup>
