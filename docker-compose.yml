@@ -4,3 +4,37 @@ services:
     command: gcloud emulators firestore start --host-port=0.0.0.0:8085
     ports:
       - "8085:8085"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --output /dev/null http://127.0.0.1:8085"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      FIRESTORE_PROJECT_ID: wb-module-local
+      FIRESTORE_EMULATOR_HOST: firestore:8085
+      AUTH_MODE: dev
+      DIRECTORY_MODE: mock
+      CORS_ORIGIN: http://localhost:5174
+    depends_on:
+      firestore:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        VITE_AUTH_MODE: dev
+        VITE_API_BASE: ""
+        VITE_ORG_DOMAIN: hyperdatalab.org
+    depends_on:
+      - backend
+    ports:
+      - "5174:80"

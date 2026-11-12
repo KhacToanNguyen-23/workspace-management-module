@@ -8,14 +8,14 @@ import java.util.List;
 import java.util.Map;
 
 /** The single JSON representation of a workspace used by every endpoint. */
-final class WorkspaceViews {
+public final class WorkspaceViews {
     private WorkspaceViews() {}
 
     /**
      * @param mine the caller's membership in this workspace, or null
      * @param showPending whether the caller may see the number of pending join requests
      */
-    static Map<String, Object> of(
+    public static Map<String, Object> of(
             WorkspaceStore store,
             WorkspaceStore.Workspace workspace,
             MembershipStore.Membership mine,

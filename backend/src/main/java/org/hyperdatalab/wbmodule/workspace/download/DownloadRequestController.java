@@ -1,4 +1,4 @@
-package org.hyperdatalab.wbmodule.workspace;
+package org.hyperdatalab.wbmodule.workspace.download;
 
 import com.google.cloud.Timestamp;
 
@@ -14,6 +14,7 @@ import org.hyperdatalab.wbmodule.common.Paging;
 import org.hyperdatalab.wbmodule.identity.AuditService;
 import org.hyperdatalab.wbmodule.store.DownloadRequestStore;
 import org.hyperdatalab.wbmodule.store.FirestoreStore;
+import org.hyperdatalab.wbmodule.workspace.AccessService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;

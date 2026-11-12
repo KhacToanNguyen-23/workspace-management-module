@@ -1,4 +1,4 @@
-package org.hyperdatalab.wbmodule.workspace;
+package org.hyperdatalab.wbmodule.admin;
 
 import com.google.cloud.firestore.DocumentSnapshot;
 

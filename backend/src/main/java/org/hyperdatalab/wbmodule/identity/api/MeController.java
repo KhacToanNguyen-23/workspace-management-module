@@ -1,4 +1,4 @@
-package org.hyperdatalab.wbmodule.workspace;
+package org.hyperdatalab.wbmodule.identity.api;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -15,6 +15,9 @@ import org.hyperdatalab.wbmodule.store.FirestoreStore;
 import org.hyperdatalab.wbmodule.store.MembershipStore;
 import org.hyperdatalab.wbmodule.store.WorkspaceRequestStore;
 import org.hyperdatalab.wbmodule.store.WorkspaceStore;
+import org.hyperdatalab.wbmodule.workspace.WorkspaceService;
+import org.hyperdatalab.wbmodule.workspace.WorkspaceViews;
+import org.hyperdatalab.wbmodule.workspace.WorkspaceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
