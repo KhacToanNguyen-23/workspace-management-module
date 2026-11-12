@@ -57,7 +57,7 @@ export function OnboardingPage() {
         title="Workspace"
         sub={
           approved
-            ? "Xin vào thêm workspace khác hoặc tạo workspace mới."
+            ? undefined
             : "Chọn một workspace và gửi yêu cầu; manager của workspace đó sẽ duyệt."
         }
         actions={
