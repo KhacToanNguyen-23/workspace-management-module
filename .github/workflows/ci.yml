@@ -13,16 +13,7 @@ on:
       - "firestore.indexes.json"
       - "firestore.rules"
   pull_request:
-    paths:
-      - ".github/workflows/ci.yml"
-      - ".dockerignore"
-      - "backend/**"
-      - "web/**"
-      - "docker-compose.yml"
-      - "package.json"
-      - "package-lock.json"
-      - "firestore.indexes.json"
-      - "firestore.rules"
+    # Run CI for every pull request, regardless of which files changed.
   workflow_dispatch:
 
 permissions:
