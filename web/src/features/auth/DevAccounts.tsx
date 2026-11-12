@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
+import { RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { ErrorBox, Tag, useAsk } from "../../shared/components/ui";
 import { GLOBAL_ROLE_LABEL, type GlobalRole } from "../../shared/lib/types";
 import { switchDevAccount } from "./auth";
 
@@ -45,82 +55,97 @@ async function resetDemoData() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
-/** Login screen: one button per demo account, plus a reset of the demo data. */
+const roleText = (a: DevAccount) =>
+  a.disabled ? "Đã disable" : GLOBAL_ROLE_LABEL[a.role];
+
+/** Login screen: one row per demo account, plus a reset of the demo data. */
 export function DevAccountList() {
   const { accounts, error, reload } = useDevAccounts();
   const [busy, setBusy] = useState(false);
   const [resetError, setResetError] = useState("");
+  const { ask, dialog } = useAsk();
 
   return (
-    <div className="stack">
-      <div className="notice">
-        Chế độ dev: bấm vào một tài khoản mẫu để đăng nhập ngay với role tương
-        ứng.
+    <div className="grid gap-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground">
+          Tài khoản mẫu (dev)
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          disabled={busy}
+          onClick={async () => {
+            const ok = await ask({
+              title: "Reset dữ liệu mẫu?",
+              description:
+                "Xoá toàn bộ dữ liệu trong emulator và tạo lại dữ liệu mẫu.",
+              confirmLabel: "Reset",
+              destructive: true,
+            });
+            if (ok === null) return;
+            setBusy(true);
+            setResetError("");
+            resetDemoData()
+              .then(reload)
+              .catch((e) => setResetError(`Reset thất bại: ${String(e)}`))
+              .finally(() => setBusy(false));
+          }}
+        >
+          <RotateCcw />
+          {busy ? "Đang reset…" : "Reset"}
+        </Button>
       </div>
-      {error && <div className="error">{error}</div>}
-      <div className="dev-accounts">
+      <ErrorBox error={error || resetError} />
+      <ul className="divide-y rounded-md border">
         {(accounts ?? []).map((a) => (
-          <button
-            key={a.email}
-            type="button"
-            className="dev-account"
-            onClick={() => switchDevAccount(a.email)}
-          >
-            <span className="row between">
-              <b>{a.name}</b>
-              <span className="tag">
-                {a.disabled ? "Đã disable" : GLOBAL_ROLE_LABEL[a.role]}
+          <li key={a.email}>
+            <button
+              type="button"
+              onClick={() => switchDevAccount(a.email)}
+              className="grid w-full gap-0.5 px-3 py-2 text-left transition-colors hover:bg-muted focus-visible:bg-muted"
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate text-[13px] font-medium">
+                  {a.name}
+                </span>
+                <Tag>{roleText(a)}</Tag>
               </span>
-            </span>
-            <span className="small muted">{a.email}</span>
-            <span className="small">{a.note}</span>
-          </button>
+              <span className="truncate text-xs text-muted-foreground">
+                {a.email} · {a.note}
+              </span>
+            </button>
+          </li>
         ))}
-      </div>
-      {resetError && <div className="error">{resetError}</div>}
-      <button
-        type="button"
-        className="link"
-        disabled={busy}
-        onClick={() => {
-          if (
-            !confirm(
-              "Xoá toàn bộ dữ liệu trong emulator và tạo lại dữ liệu mẫu?",
-            )
-          )
-            return;
-          setBusy(true);
-          setResetError("");
-          resetDemoData()
-            .then(reload)
-            .catch((e) => setResetError(`Reset thất bại: ${String(e)}`))
-            .finally(() => setBusy(false));
-        }}
-      >
-        {busy ? "Đang reset…" : "Reset dữ liệu mẫu"}
-      </button>
+      </ul>
+      {dialog}
     </div>
   );
 }
 
-/** Sidebar: switch to another demo account without going through the login screen. */
-export function DevAccountSwitcher({ current }: { current: string }) {
+/** User menu submenu: switch to another demo account without the login screen. */
+export function DevAccountMenu({ current }: { current: string }) {
   const { accounts } = useDevAccounts();
   if (!accounts) return null;
   return (
-    <label className="field dev-switcher">
-      <span>Đổi tài khoản (dev)</span>
-      <select
-        value={accounts.some((a) => a.email === current) ? current : ""}
-        onChange={(e) => e.target.value && switchDevAccount(e.target.value)}
-      >
-        <option value="">— chọn —</option>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>Đổi tài khoản (dev)</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="w-64">
         {accounts.map((a) => (
-          <option key={a.email} value={a.email}>
-            {a.name} · {a.disabled ? "đã disable" : GLOBAL_ROLE_LABEL[a.role]}
-          </option>
+          <DropdownMenuItem
+            key={a.email}
+            onSelect={() => switchDevAccount(a.email)}
+            className={cn(
+              "flex items-center justify-between gap-2",
+              a.email === current && "bg-accent",
+            )}
+          >
+            <span className="truncate">{a.name}</span>
+            <span className="text-xs text-muted-foreground">{roleText(a)}</span>
+          </DropdownMenuItem>
         ))}
-      </select>
-    </label>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }

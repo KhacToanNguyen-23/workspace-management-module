@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PageHeader, ErrorBox, useAction } from "../../shared/components/ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  ErrorBox,
+  Field,
+  PageBody,
+  PageHeader,
+  SelectField,
+  useAction,
+} from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
 
 export function CreateWorkspacePage() {
@@ -14,15 +24,14 @@ export function CreateWorkspacePage() {
     description: "",
   });
   return (
-    <div>
+    <>
       <PageHeader
         title="Tạo workspace"
         sub="Workspace sẽ được tạo cùng quyền quản lý của bạn."
       />
-      <section className="card">
-        <ErrorBox error={act.error ?? types.error} />
+      <PageBody>
         <form
-          className="stack"
+          className="grid max-w-lg gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             void act
@@ -32,32 +41,41 @@ export function CreateWorkspacePage() {
               });
           }}
         >
-          <input
-            required
-            placeholder="Tên workspace"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <select
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value })}
-          >
-            {(types.data ?? []).map((t) => (
-              <option key={t.code} value={t.code}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          <textarea
-            placeholder="Mô tả"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-          <button className="primary" disabled={act.busy}>
-            Tạo workspace
-          </button>
+          <Field label="Tên workspace" htmlFor="cw-name">
+            <Input
+              id="cw-name"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </Field>
+          <Field label="Loại" htmlFor="cw-type">
+            <SelectField
+              id="cw-type"
+              size="default"
+              className="w-full"
+              value={form.type}
+              onChange={(type) => setForm({ ...form, type })}
+              options={(types.data ?? []).map((t) => ({
+                value: t.code,
+                label: t.name,
+              }))}
+            />
+          </Field>
+          <Field label="Mô tả" htmlFor="cw-desc" hint="Tuỳ chọn">
+            <Textarea
+              id="cw-desc"
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </Field>
+          <ErrorBox error={act.error ?? types.error} />
+          <div>
+            <Button disabled={act.busy}>Tạo workspace</Button>
+          </div>
         </form>
-      </section>
-    </div>
+      </PageBody>
+    </>
   );
 }
