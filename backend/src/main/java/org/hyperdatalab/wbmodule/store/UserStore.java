@@ -59,13 +59,13 @@ public class UserStore {
         DocumentSnapshot snapshot =
                 FirestoreStore.await(transaction.get(firestore.doc("users", email)));
         return snapshot.exists()
-                ? Optional.of(user(email, FirestoreStore.data(snapshot)))
+                ? Optional.of(user(email, FirestoreStore.raw(snapshot)))
                 : Optional.empty();
     }
 
     public List<User> all() {
         return firestore.all("users").stream()
-                .map(snapshot -> user(snapshot.getId(), FirestoreStore.data(snapshot)))
+                .map(snapshot -> user(snapshot.getId(), FirestoreStore.raw(snapshot)))
                 .toList();
     }
 

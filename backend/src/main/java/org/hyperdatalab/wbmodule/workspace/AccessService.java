@@ -12,7 +12,6 @@ import java.util.Optional;
 public class AccessService {
     public record WorkspaceRow(
             String id,
-            String slug,
             String name,
             String type,
             String description,
@@ -40,7 +39,6 @@ public class AccessService {
                         d ->
                                 new WorkspaceRow(
                                         id,
-                                        (String) d.get("slug"),
                                         (String) d.get("name"),
                                         (String) d.get("type"),
                                         (String) d.getOrDefault("description", ""),
