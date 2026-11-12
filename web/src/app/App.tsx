@@ -239,7 +239,10 @@ function AppSidebar() {
     (me.user.isAdmin ||
       !!me.memberships.find((m) => m.workspace.id === wid)?.canManage);
   return (
-    <Sidebar collapsible="icon" className="border-transparent">
+    <Sidebar
+      collapsible="icon"
+      className="border-transparent [&_[data-slot=sidebar-inner]]:bg-background"
+    >
       <SidebarHeader className="h-14 shrink-0 justify-center gap-0 border-b border-border bg-background px-2 py-0">
         <div className="flex items-center group-data-[collapsible=icon]:justify-center">
           <div className="flex min-w-0 items-center gap-2.5 px-1 group-data-[collapsible=icon]:px-0">
@@ -255,6 +258,7 @@ function AppSidebar() {
           </div>
         </div>
       </SidebarHeader>
+      <div className="flex min-h-0 flex-1 flex-col rounded-tr-[20px] bg-sidebar">
       <SidebarContent className="gap-0 overflow-x-hidden pt-8 pb-2">
         <SidebarGroup className="pt-0 pb-3">
           <WorkspaceSwitcher />
@@ -320,6 +324,7 @@ function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-2">
         <UserMenu />
       </SidebarFooter>
+      </div>
       <SidebarEdgeToggle />
     </Sidebar>
   );
