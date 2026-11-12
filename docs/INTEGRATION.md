@@ -18,7 +18,7 @@ Base path: `/api/v1`. Mọi route (trừ `GET /api/health` và `/api/dev/*` ở 
 - **Method:** `GET` đọc, `POST` tạo (trả `201` + header `Location`), `PUT` đặt trạng thái của chính người gọi (`members/me`), `PATCH` đổi một phần hoặc chuyển trạng thái (`{"status": ...}`), `DELETE` rút/xoá. Yêu cầu bị rút vẫn được giữ lại với trạng thái `withdrawn` để phục vụ audit.
 - **Lọc** bằng query: `status=`, `requester=me`, `workspaceId=`, `q=`, `role=`, `disabled=`.
 - **Phân trang** các collection: `limit` (mặc định 100, tối đa 500) và `offset`. Thân phản hồi vẫn là mảng JSON; tổng số nằm ở header `X-Total-Count`, trang kế/trước ở header `Link` (`rel="next"` / `rel="prev"`). `limit`/`offset` sai giá trị → `422`, sai kiểu → `400 bad_parameter`.
-- **Lỗi:** `{"error":{"code":"...","message":"..."}}` với `401` (kèm `WWW-Authenticate`), `403`, `404`, `409` (xung đột trạng thái), `422` (dữ liệu sai), `502` (directory lỗi).
+- **Lỗi:** `{"error":{"code":"...","message":"..."}}` với `401` (kèm `WWW-Authenticate`), `403`, `404`, `405` (kèm `Allow`), `409` (xung đột trạng thái), `415` (body không phải JSON), `422` (dữ liệu sai), `502` (directory lỗi).
 - **Mô tả workspace** thống nhất ở mọi endpoint: `id, name, type, description, status, createdBy, createdAt, managers[], memberCount`, cùng `pendingCount` (admin và manager của workspace đó), `myStatus`/`myRole` (nếu caller có membership) và `canManage` (khi đọc một workspace).
 
 ### Hồ sơ và catalogue

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +30,30 @@ class RestConventionsApiTest extends IntegrationTest {
         assertThat(get("/api/me", ALICE).status()).isEqualTo(404);
         assertThat(get("/api/admin/users", ADMIN).status()).isEqualTo(404);
         assertThat(get("/api/health", null).status()).isEqualTo(200);
+    }
+
+    // ---- error statuses -----------------------------------------------------------------------
+
+    @Test
+    void unsupportedMethodsAnswer405WithAnAllowHeader() throws Exception {
+        Res r = call("DELETE", V1 + "/me", ALICE, null);
+        assertThat(r.status()).isEqualTo(405);
+        assertThat(r.code()).isEqualTo("method_not_allowed");
+        assertThat(r.header("Allow")).contains("GET");
+        assertThat(call("PUT", V1 + "/workspaces", ADMIN, Map.of()).status()).isEqualTo(405);
+    }
+
+    @Test
+    void aBodyThatIsNotJsonAnswers415() throws Exception {
+        var result =
+                mvc.perform(
+                                MockMvcRequestBuilders.post(V1 + "/workspaces")
+                                        .header("Authorization", "Bearer dev:" + ADMIN)
+                                        .contentType(MediaType.TEXT_PLAIN)
+                                        .content("name=x"))
+                        .andReturn();
+        assertThat(result.getResponse().getStatus()).isEqualTo(415);
+        assertThat(result.getResponse().getContentAsString()).contains("unsupported_media_type");
     }
 
     // ---- Location ----------------------------------------------------------------------------
