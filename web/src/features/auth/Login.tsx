@@ -11,7 +11,8 @@ import { AUTH_MODE, ORG_DOMAIN, useAuth } from "./auth";
 import { DevAccountList } from "./DevAccounts";
 
 export function LoginPage() {
-  const { session, ready, error, signInGoogle, signInDev } = useAuth();
+  const { session, ready, error, signInGoogle, signInSso, signInDev } =
+    useAuth();
   const { t, lang, setLang } = useLang();
   const [email, setEmail] = useState("");
   const from = (useLocation().state as { from?: string } | null)?.from;
@@ -41,7 +42,11 @@ export function LoginPage() {
             {t.loginBody(ORG_DOMAIN)}
           </p>
           <div className="mt-6 grid gap-5">
-            {AUTH_MODE === "firebase" ? (
+            {AUTH_MODE === "sso" ? (
+              <Button className="w-full" onClick={() => void signInSso(target)}>
+                {t.loginSso}
+              </Button>
+            ) : AUTH_MODE === "firebase" ? (
               <Button className="w-full" onClick={() => void signInGoogle()}>
                 {t.loginGoogle}
               </Button>

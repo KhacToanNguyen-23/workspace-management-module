@@ -13,6 +13,7 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 
 import org.hyperdatalab.wbmodule.common.ApiException;
 import org.hyperdatalab.wbmodule.common.AppProperties;
+import org.hyperdatalab.wbmodule.store.SessionStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -33,9 +34,10 @@ public class TokenVerifiers {
     }
 
     @Bean
-    TokenVerifier tokenVerifier(AppProperties props) throws Exception {
+    TokenVerifier tokenVerifier(AppProperties props, SessionStore sessions) throws Exception {
         return switch (props.auth().mode()) {
             case "dev" -> new DevTokenVerifier();
+            case "sso" -> new SessionTokenVerifier(sessions);
             case "firebase" ->
                     new FirebaseTokenVerifier(
                             props.auth().firebaseProjectId(),
@@ -43,8 +45,32 @@ public class TokenVerifiers {
                             JWKSourceBuilder.create(new URL(FirebaseTokenVerifier.JWKS))
                                     .retrying(true)
                                     .build());
-            default -> throw new IllegalStateException("app.auth.mode must be firebase or dev");
+            default ->
+                    throw new IllegalStateException("app.auth.mode must be sso, firebase or dev");
         };
+    }
+
+    /**
+     * HyperDataLab SSO: the bearer token is a session issued by {@link SessionController} after
+     * it exchanged the user's authorization code itself. Only its hash is stored.
+     */
+    static final class SessionTokenVerifier implements TokenVerifier {
+        private final SessionStore sessions;
+
+        SessionTokenVerifier(SessionStore sessions) {
+            this.sessions = sessions;
+        }
+
+        @Override
+        public TokenIdentity verify(String token) {
+            return sessions.find(token)
+                    .map(s -> new TokenIdentity(s.uid(), s.email(), s.name(), s.picture()))
+                    .orElseThrow(
+                            () ->
+                                    unauthorized(
+                                            "invalid_token",
+                                            "Session expired or invalid; sign in again."));
+        }
     }
 
     /** Local development only: `dev:<email>` or `dev:<email>|<name>`. */

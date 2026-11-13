@@ -12,17 +12,29 @@ public record AppProperties(
         @DefaultValue("admin@hyperdatalab.org") String adminEmail,
         @DefaultValue Auth auth,
         @DefaultValue Directory directory,
-        @DefaultValue("http://localhost:5174") List<String> corsOrigins) {
+        @DefaultValue("http://localhost:3000") List<String> corsOrigins) {
 
     /**
-     * mode=firebase verifies Firebase ID tokens (production); mode=dev accepts `Bearer dev:<email>`
-     * and must only be used locally. allowedProviders: identity providers accepted as SSO (Firebase
-     * `sign_in_provider` values).
+     * mode=sso signs users in through the HyperDataLab SSO (production); mode=firebase verifies
+     * Firebase ID tokens; mode=dev accepts `Bearer dev:<email>` and must only be used locally.
+     * allowedProviders: identity providers accepted in firebase mode (`sign_in_provider` values).
      */
     public record Auth(
             @DefaultValue("firebase") String mode,
             @DefaultValue("hyperdatalab-writing-bank") String firebaseProjectId,
-            @DefaultValue("google.com") List<String> allowedProviders) {}
+            @DefaultValue("google.com") List<String> allowedProviders,
+            @DefaultValue Sso sso) {}
+
+    /**
+     * The HyperDataLab SSO (OAuth 2.0 Authorization Code + PKCE on the ResearchPulse Worker).
+     * clientSecret is empty for a Public client. sessionHours: how long a sign-in lasts here
+     * before the user goes through the SSO again.
+     */
+    public record Sso(
+            String baseUrl,
+            String clientId,
+            String clientSecret,
+            @DefaultValue("12") int sessionHours) {}
 
     /**
      * Where user information for the org domain comes from. mode=http : an external REST API (GET

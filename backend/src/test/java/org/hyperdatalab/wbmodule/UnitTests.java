@@ -111,4 +111,86 @@ class UnitTests {
             assertThat(all.get(0).department()).isEqualTo("R&D");
         }
     }
+
+    /** {@code listAll} following {@code nextPageToken} across pages. */
+    @Nested
+    class HttpDirectoryPaging {
+        HttpServer server;
+        /** Body served for each pageToken ("" = first page). */
+        java.util.Map<String, String> pages = new java.util.HashMap<>();
+
+        @BeforeEach
+        void start() throws Exception {
+            server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            server.createContext(
+                    "/users",
+                    ex -> {
+                        String query = ex.getRequestURI().getQuery();
+                        String token =
+                                query.contains("pageToken=")
+                                        ? query.substring(query.indexOf("pageToken=") + 10)
+                                        : "";
+                        String body = pages.getOrDefault(token, "{\"users\":[]}");
+                        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                        ex.sendResponseHeaders(200, bytes.length);
+                        ex.getResponseBody().write(bytes);
+                        ex.close();
+                    });
+            server.start();
+        }
+
+        @AfterEach
+        void stop() {
+            server.stop(0);
+        }
+
+        HttpUserDirectory dir() {
+            return new HttpUserDirectory(
+                    new ObjectMapper(),
+                    "http://127.0.0.1:" + server.getAddress().getPort(),
+                    "",
+                    "hyperdatalab.org");
+        }
+
+        static String page(String email, String next) {
+            return "{\"users\":[{\"email\":\""
+                    + email
+                    + "\",\"name\":\"x\"}],\"nextPageToken\":"
+                    + (next == null ? "null" : "\"" + next + "\"")
+                    + "}";
+        }
+
+        @Test
+        void readsEveryPage() {
+            pages.put("", page("a@hyperdatalab.org", "p2"));
+            pages.put("p2", page("b@hyperdatalab.org", "p3"));
+            pages.put("p3", page("c@hyperdatalab.org", null));
+            assertThat(dir().listAll())
+                    .extracting(UserDirectory.DirectoryUser::email)
+                    .containsExactly(
+                            "a@hyperdatalab.org", "b@hyperdatalab.org", "c@hyperdatalab.org");
+        }
+
+        @Test
+        void emptyTokenEndsTheList() {
+            pages.put("", page("a@hyperdatalab.org", ""));
+            assertThat(dir().listAll()).hasSize(1);
+        }
+
+        @Test
+        void repeatedTokenIsAnError() {
+            pages.put("", page("a@hyperdatalab.org", "p2"));
+            pages.put("p2", page("b@hyperdatalab.org", "p2"));
+            assertThatThrownBy(() -> dir().listAll())
+                    .isInstanceOf(UserDirectory.DirectoryException.class)
+                    .hasMessageContaining("repeated");
+        }
+
+        @Test
+        void objectWithoutUserListIsAnError() {
+            pages.put("", "{\"items\":[]}");
+            assertThatThrownBy(() -> dir().listAll())
+                    .isInstanceOf(UserDirectory.DirectoryException.class);
+        }
+    }
 }

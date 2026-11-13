@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Navigate,
   NavLink,
@@ -52,6 +52,8 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AdminPage } from "../features/admin/Admin";
 import { LoginPage } from "../features/auth/Login";
+import { SsoCallbackPage } from "../features/auth/SsoCallback";
+import { isSsoReturn } from "../features/auth/sso";
 import { AUTH_MODE, useAuth } from "../features/auth/auth";
 import { DevAccountMenu } from "../features/auth/DevAccounts";
 import { EntryPage } from "../features/entry/EntryPage";
@@ -463,6 +465,17 @@ function WorkspaceRoute() {
 }
 
 export function App() {
+  // The SSO may return to any registered URL of the app (even "/"), so the sign-in is finished
+  // wherever its ?code&state arrive. The query is captured once: completing the sign-in removes
+  // the pending attempt, and this must keep rendering until the navigation that follows.
+  const [ssoReturn] = useState(() =>
+    AUTH_MODE === "sso" && isSsoReturn(window.location.search)
+      ? window.location.search
+      : null,
+  );
+  const { search } = useLocation();
+  if (ssoReturn !== null && search === ssoReturn)
+    return <SsoCallbackPage search={ssoReturn} />;
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

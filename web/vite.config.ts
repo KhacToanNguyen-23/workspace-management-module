@@ -5,11 +5,13 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // One `.env` at the repository root serves the backend and the web app (see .env.example).
+  envDir: path.resolve(__dirname, ".."),
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
   },
   server: {
-    port: 5174,
+    port: 3000,
     // Local: the Java backend runs on 8080 (`npm run dev:backend`).
     proxy: { "/api": "http://127.0.0.1:8080" },
   },

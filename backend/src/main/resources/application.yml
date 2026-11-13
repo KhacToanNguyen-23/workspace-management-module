@@ -18,11 +18,19 @@ app:
   org-domain: hyperdatalab.org
   # Seeds demo accounts/workspace at startup. Only has an effect when auth.mode is dev.
   dev-seed: ${DEV_SEED:true}
-  admin-email: admin@hyperdatalab.org
+  # The first admin; must be a real account in the user directory.
+  admin-email: ${ADMIN_EMAIL:admin@hyperdatalab.org}
   auth:
-    # firebase (production) | dev (local only: Bearer dev:<email>)
+    # sso (production: HyperDataLab SSO) | firebase | dev (local only: Bearer dev:<email>)
     mode: ${AUTH_MODE:dev}
-    firebase-project-id: hyperdatalab-writing-bank
+    sso:
+      # The ResearchPulse Worker that serves /oauth/authorize, /oauth/token and /oauth/userinfo.
+      base-url: ${SSO_BASE_URL:}
+      client-id: ${SSO_CLIENT_ID:}
+      # Empty for a Public client; set it for a Confidential one.
+      client-secret: ${SSO_CLIENT_SECRET:}
+      session-hours: ${SSO_SESSION_HOURS:12}
+    firebase-project-id: ${FIREBASE_PROJECT_ID:hyperdatalab-writing-bank}
   directory:
     # http (external user API) | google (Admin SDK) | mock | off
     mode: ${DIRECTORY_MODE:mock}
@@ -31,4 +39,4 @@ app:
     google-service-account-file: ${GOOGLE_SA_FILE:}
     cache-hours: 12
   cors-origins:
-    - ${CORS_ORIGIN:http://localhost:5174}
+    - ${CORS_ORIGIN:http://localhost:3000}

@@ -7,20 +7,27 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  completeSsoSignIn,
+  endSsoSession,
+  loadSsoSession,
+  startSsoSignIn,
+} from "./sso";
 
 /**
  * Single sign-on.
  *
- * Production ("firebase"): the user signs in once with the organisation's Google account
- * (OpenID Connect, brokered by Firebase Auth, restricted with `hd=<org domain>`). Firebase keeps
- * the session, so returning users are signed in silently, and it renews the ID token before it
- * expires. Every API call carries the ID token as `Authorization: Bearer`; the backend verifies
- * it as the relying party. Signing out ends the app session on this device.
+ * Production ("sso"): the user signs in through the HyperDataLab SSO (see ./sso.ts). The backend
+ * exchanges the authorization code and issues a session token that every API call carries as
+ * `Authorization: Bearer`. The session lasts some hours; after that the user goes through the
+ * SSO again. Signing out ends the session at once.
+ *
+ * "firebase": Google sign-in brokered by Firebase Auth; the bearer token is the Firebase ID token.
  *
  * Local development ("dev"): the token is simply `dev:<email>`; the backend must run AUTH_MODE=dev.
  */
 export const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE ?? "dev") as
-  "dev" | "firebase";
+  "dev" | "firebase" | "sso";
 export const ORG_DOMAIN = import.meta.env.VITE_ORG_DOMAIN ?? "hyperdatalab.org";
 
 export function isOrgEmail(email: string | null | undefined): boolean {
@@ -43,6 +50,10 @@ interface AuthState {
   ready: boolean;
   error: string;
   signInGoogle(): Promise<void>;
+  /** Leaves for the SSO; `returnTo` is the in-app path to open after signing in. */
+  signInSso(returnTo: string): Promise<void>;
+  /** Finishes an SSO sign-in on /auth/callback and returns the path to open. */
+  completeSso(search: string): Promise<string>;
   signInDev(email: string): void;
   signOut(): Promise<void>;
   /** forceRefresh asks the identity provider for a new ID token (used once after a 401). */
@@ -95,6 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         /* storage blocked: stay signed out */
       }
+      setReady(true);
+      return;
+    }
+    if (AUTH_MODE === "sso") {
+      const stored = loadSsoSession();
+      if (stored) setSession({ email: stored.email, name: stored.name });
       setReady(true);
       return;
     }
@@ -156,6 +173,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signInSso = useCallback(async (returnTo: string) => {
+    setError("");
+    try {
+      await startSsoSignIn(returnTo);
+    } catch (e) {
+      setError(`Đăng nhập thất bại: ${String((e as Error).message ?? e)}`);
+    }
+  }, []);
+
+  const completeSso = useCallback(async (search: string) => {
+    const { session: s, returnTo } = await completeSsoSignIn(search);
+    setError("");
+    setSession({ email: s.email, name: s.name });
+    return returnTo;
+  }, []);
+
   const signInDev = useCallback((email: string) => {
     const e = email.trim().toLowerCase();
     if (!isOrgEmail(e)) {
@@ -181,6 +214,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(null);
       return;
     }
+    if (AUTH_MODE === "sso") {
+      await endSsoSession();
+      setSession(null);
+      return;
+    }
     const { auth, m } = await loadFirebase();
     await m.signOut(auth);
   }, []);
@@ -188,6 +226,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const getToken = useCallback(
     async (forceRefresh = false) => {
       if (AUTH_MODE === "dev") return session ? `dev:${session.email}` : null;
+      // No renewal in SSO mode: an expired session yields no token, the API answers 401 and the
+      // user is signed out to go through the SSO again.
+      if (AUTH_MODE === "sso") return loadSsoSession()?.token ?? null;
       const { auth } = await loadFirebase();
       // getIdToken renews the token by itself when it is about to expire.
       return (await auth.currentUser?.getIdToken(forceRefresh)) ?? null;
@@ -201,11 +242,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready,
       error,
       signInGoogle,
+      signInSso,
+      completeSso,
       signInDev,
       signOut,
       getToken,
     }),
-    [session, ready, error, signInGoogle, signInDev, signOut, getToken],
+    [
+      session,
+      ready,
+      error,
+      signInGoogle,
+      signInSso,
+      completeSso,
+      signInDev,
+      signOut,
+      getToken,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

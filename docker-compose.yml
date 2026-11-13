@@ -19,7 +19,7 @@ services:
       FIRESTORE_EMULATOR_HOST: firestore:8085
       AUTH_MODE: dev
       DIRECTORY_MODE: mock
-      CORS_ORIGIN: http://localhost:5174
+      CORS_ORIGIN: http://localhost:3000
     depends_on:
       firestore:
         condition: service_healthy
@@ -37,4 +37,4 @@ services:
     depends_on:
       - backend
     ports:
-      - "5174:80"
+      - "3000:80"
