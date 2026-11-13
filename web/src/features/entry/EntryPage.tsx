@@ -33,21 +33,21 @@ export function EntryPage() {
               HyperSpace
             </span>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 sm:gap-6">
             <LangToggle lang={lang} onChange={setLang} label={t.langLabel} />
             {!session && (
               <Button
                 asChild
                 variant="ghost"
                 size="sm"
-                className="hidden min-w-(--size-action-sm) sm:inline-flex"
+                className="hidden h-10 px-5 sm:inline-flex"
               >
                 <Link to="/login" className="text-foreground! no-underline!">
                   {t.signIn}
                 </Link>
               </Button>
             )}
-            <Button asChild size="sm" className="min-w-(--size-action-md)">
+            <Button asChild size="sm" className="h-10 px-5">
               <Link to={enterTo} className="text-primary-foreground! no-underline!">
                 {t.enter}
               </Link>
@@ -71,7 +71,7 @@ export function EntryPage() {
               {t.description}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg" className="min-w-(--size-action-lg)">
+              <Button asChild size="lg" className="px-5">
                 <Link
                   to={enterTo}
                   className="text-primary-foreground! no-underline!"
@@ -79,7 +79,7 @@ export function EntryPage() {
                   {t.enter}
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="min-w-(--size-action-lg)">
+              <Button asChild size="lg" variant="outline" className="px-5">
                 <a
                   href="#capabilities"
                   className="text-foreground! no-underline!"
