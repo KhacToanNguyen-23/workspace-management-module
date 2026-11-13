@@ -18,7 +18,6 @@ import {
   Layers,
   LayoutList,
   LogOut,
-  Settings as SettingsIcon,
   Shield,
   UserPlus,
   Users,
@@ -59,7 +58,6 @@ import { EntryPage } from "../features/entry/EntryPage";
 import { DownloadsPage } from "../features/workspaces/Downloads";
 import { MembersPage } from "../features/workspaces/Members";
 import { OnboardingPage } from "../features/workspaces/Onboarding";
-import { SettingsPage } from "../features/settings/Settings";
 import { WorkspaceHomePage } from "../features/workspaces/WorkspaceHome";
 import { HyperSpaceMark } from "../shared/components/Brand";
 import { ErrorBox, Loading } from "../shared/components/ui";
@@ -304,7 +302,6 @@ function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <NavItem to="/onboarding" icon={UserPlus} label={tr("Tất cả workspace")} />
-              <NavItem to="/settings" icon={SettingsIcon} label={tr("Cài đặt")} />
               {me.user.isAdmin && (
                 <NavItem to="/admin" icon={Shield} label={tr("Quản trị")} />
               )}
@@ -480,7 +477,6 @@ export function App() {
         <Route index element={<Home />} />
         <Route path="onboarding" element={<OnboardingPage />} />
         <Route path="create-workspace" element={<Navigate to="/onboarding" replace />} />
-        <Route path="settings" element={<SettingsPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route path="w/:wid" element={<WorkspaceRoute />}>
           <Route index element={<WorkspaceHomePage />} />

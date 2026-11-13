@@ -5,9 +5,6 @@
 export const EN: Record<string, string> = {
   // Navigation and shell
   "Chung": "General",
-  "Cài đặt": "Settings",
-  "Ngôn ngữ": "Language",
-  "Chọn ngôn ngữ hiển thị của giao diện.": "Choose the language of the interface.",
   "Tổng quan": "Overview",
   "Yêu cầu download": "Download requests",
   "Quản lý workspace": "Manage workspace",
