@@ -139,6 +139,9 @@ export interface AuditRow {
   target: string;
   workspaceId: string | null;
   detail: Record<string, unknown>;
+  /** Display names resolved by the API; null when the person or object no longer exists. */
+  actorName?: string | null;
+  targetName?: string | null;
 }
 export interface Person {
   email: string;

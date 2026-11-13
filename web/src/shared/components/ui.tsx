@@ -134,6 +134,36 @@ export function PageBody({
 }
 
 /** A flat section: a compact heading row over its content, separated by whitespace, not cards. */
+/**
+ * A list or table that can grow without bound (members, audit, requests…). Past
+ * --size-list-max it scrolls inside itself instead of stretching the page, and a table's header
+ * row stays visible while scrolling. The box also takes over the table's horizontal scrolling,
+ * so sticky headers work on narrow screens too.
+ */
+export function ScrollList({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      data-slot="scroll-list"
+      className={cn(
+        "scrollbar-minimal max-h-(--size-list-max) overflow-auto overscroll-contain",
+        "[&_[data-slot=table-container]]:overflow-visible",
+        // z-1: above this box's own rows only, so it still slides under the page toolbar (z-10).
+        "[&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-1 [&_thead_th]:bg-background",
+        "[&_thead_th]:shadow-[inset_0_-1px_0_var(--border)]",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function Section({
   title,
   count,

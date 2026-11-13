@@ -36,6 +36,7 @@ import {
   fmtShort,
   useAction,
   useAsk,
+  ScrollList,
 } from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
 import type { DownloadRequest } from "../../shared/lib/types";
@@ -230,72 +231,74 @@ export function DownloadsPage() {
           ) : !mine.data ? (
             <Loading />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Paper</TableHead>
-                  <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
-                  <TableHead className="w-28">{tr("Trạng thái")}</TableHead>
-                  <TableHead>{tr("Ghi chú manager")}</TableHead>
-                  <TableHead className="w-10">
-                    <span className="sr-only">{tr("Thao tác")}</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {myRows.length === 0 && (
-                  <EmptyRow colSpan={5}>
-                    {mine.data.length === 0
-                      ? tr("Chưa có yêu cầu.")
-                      : tr("Không có yêu cầu khớp bộ lọc.")}
-                  </EmptyRow>
-                )}
-                {myRows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="max-w-md">
-                      <Stacked primary={r.paperRef} secondary={r.note} />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
-                      {fmtShort(r.requestedAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge value={r.status} />
-                    </TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground">
-                      {r.decisionNote || "—"}
-                    </TableCell>
-                    <TableCell>
-                      {r.status === "pending" && (
-                        <DropdownMenu>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={tr("Thao tác")}
-                                >
-                                  <MoreHorizontal />
-                                </Button>
-                              </DropdownMenuTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>{tr("Thao tác")}</TooltipContent>
-                          </Tooltip>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              disabled={act.busy}
-                              onSelect={() => withdraw(r.id)}
-                            >
-                              {tr("Rút yêu cầu")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
+            <ScrollList>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Paper</TableHead>
+                    <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                    <TableHead className="w-28">{tr("Trạng thái")}</TableHead>
+                    <TableHead>{tr("Ghi chú manager")}</TableHead>
+                    <TableHead className="w-10">
+                      <span className="sr-only">{tr("Thao tác")}</span>
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {myRows.length === 0 && (
+                    <EmptyRow colSpan={5}>
+                      {mine.data.length === 0
+                        ? tr("Chưa có yêu cầu.")
+                        : tr("Không có yêu cầu khớp bộ lọc.")}
+                    </EmptyRow>
+                  )}
+                  {myRows.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="max-w-md">
+                        <Stacked primary={r.paperRef} secondary={r.note} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                        {fmtShort(r.requestedAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge value={r.status} />
+                      </TableCell>
+                      <TableCell className="text-[13px] text-muted-foreground">
+                        {r.decisionNote || "—"}
+                      </TableCell>
+                      <TableCell>
+                        {r.status === "pending" && (
+                          <DropdownMenu>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={tr("Thao tác")}
+                                  >
+                                    <MoreHorizontal />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                              </TooltipTrigger>
+                              <TooltipContent>{tr("Thao tác")}</TooltipContent>
+                            </Tooltip>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                disabled={act.busy}
+                                onSelect={() => withdraw(r.id)}
+                              >
+                                {tr("Rút yêu cầu")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollList>
           )}
         </Section>
 
@@ -306,70 +309,72 @@ export function DownloadsPage() {
             ) : !queue.data ? (
               <Loading />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Paper</TableHead>
-                    <TableHead>{tr("Người yêu cầu")}</TableHead>
-                    <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
-                    <TableHead className="w-28">{tr("Trạng thái")}</TableHead>
-                    <TableHead className="w-44 text-right">
-                      <span className="sr-only">{tr("Thao tác")}</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {queueRows.length === 0 && (
-                    <EmptyRow colSpan={5}>
-                      {queue.data.length === 0
-                        ? tr("Không có yêu cầu chờ duyệt.")
-                        : tr("Không có yêu cầu khớp bộ lọc.")}
-                    </EmptyRow>
-                  )}
-                  {queueRows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="max-w-md">
-                        <Stacked primary={r.paperRef} secondary={r.note} />
-                      </TableCell>
-                      <TableCell>
-                        <Stacked
-                          primary={r.requesterName || r.requester}
-                          secondary={r.requester}
-                        />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
-                        {fmtShort(r.requestedAt)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge value={r.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {r.status === "pending" && (
-                          <div className="flex justify-end gap-1.5">
-                            <Button
-                              className="min-w-(--size-action-sm)"
-                              size="sm"
-                              disabled={act.busy}
-                              onClick={() => void decide(r.id, "approve")}
-                            >
-                              {tr("Duyệt")}
-                            </Button>
-                            <Button
-                              className="min-w-(--size-action-sm)"
-                              size="sm"
-                              variant="outline"
-                              disabled={act.busy}
-                              onClick={() => void decide(r.id, "reject")}
-                            >
-                              {tr("Từ chối")}
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
+              <ScrollList>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Paper</TableHead>
+                      <TableHead>{tr("Người yêu cầu")}</TableHead>
+                      <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                      <TableHead className="w-28">{tr("Trạng thái")}</TableHead>
+                      <TableHead className="w-44 text-right">
+                        <span className="sr-only">{tr("Thao tác")}</span>
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {queueRows.length === 0 && (
+                      <EmptyRow colSpan={5}>
+                        {queue.data.length === 0
+                          ? tr("Không có yêu cầu chờ duyệt.")
+                          : tr("Không có yêu cầu khớp bộ lọc.")}
+                      </EmptyRow>
+                    )}
+                    {queueRows.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="max-w-md">
+                          <Stacked primary={r.paperRef} secondary={r.note} />
+                        </TableCell>
+                        <TableCell>
+                          <Stacked
+                            primary={r.requesterName || r.requester}
+                            secondary={r.requester}
+                          />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                          {fmtShort(r.requestedAt)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge value={r.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {r.status === "pending" && (
+                            <div className="flex justify-end gap-1.5">
+                              <Button
+                                className="min-w-(--size-action-sm)"
+                                size="sm"
+                                disabled={act.busy}
+                                onClick={() => void decide(r.id, "approve")}
+                              >
+                                {tr("Duyệt")}
+                              </Button>
+                              <Button
+                                className="min-w-(--size-action-sm)"
+                                size="sm"
+                                variant="outline"
+                                disabled={act.busy}
+                                onClick={() => void decide(r.id, "reject")}
+                              >
+                                {tr("Từ chối")}
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollList>
             )}
           </Section>
         )}
