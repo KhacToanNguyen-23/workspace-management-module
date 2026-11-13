@@ -28,26 +28,26 @@ export function EntryPage() {
             className="flex items-center gap-2 text-foreground! no-underline!"
             aria-label="HyperSpace"
           >
-            <HyperSpaceMark />
-            <span className="text-[15px] font-semibold tracking-tight">
+            <HyperSpaceMark className="size-9" />
+            <span className="hidden text-lg font-semibold tracking-tight min-[430px]:inline">
               HyperSpace
             </span>
           </Link>
-          <div className="flex items-center gap-3 sm:gap-6">
+          <div className="flex items-center gap-1.5">
             <LangToggle lang={lang} onChange={setLang} label={t.langLabel} />
             {!session && (
               <Button
                 asChild
                 variant="ghost"
                 size="sm"
-                className="hidden h-10 px-5 sm:inline-flex"
+                className="hidden sm:inline-flex"
               >
                 <Link to="/login" className="text-foreground! no-underline!">
                   {t.signIn}
                 </Link>
               </Button>
             )}
-            <Button asChild size="sm" className="h-10 px-5">
+            <Button asChild size="sm">
               <Link to={enterTo} className="text-primary-foreground! no-underline!">
                 {t.enter}
               </Link>
