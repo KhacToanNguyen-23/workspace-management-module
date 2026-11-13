@@ -15,7 +15,7 @@ export function LangToggle({
     <div
       role="group"
       aria-label={label}
-      className="inline-flex h-8 items-center rounded-md border p-0.5 text-xs"
+      className="inline-flex h-8 shrink-0 items-center rounded-md border p-0.5 text-xs"
     >
       {(["vi", "en"] as const).map((l) => (
         <button
@@ -24,7 +24,7 @@ export function LangToggle({
           aria-pressed={lang === l}
           onClick={() => onChange(l)}
           className={cn(
-            "h-full rounded-sm px-2 font-medium uppercase text-muted-foreground transition-colors hover:text-foreground",
+            "h-full w-8 rounded-sm font-medium uppercase text-muted-foreground transition-colors hover:text-foreground",
             lang === l && "bg-secondary text-foreground",
           )}
         >

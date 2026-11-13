@@ -91,6 +91,15 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Minimum widths for buttons with a fixed role (sign in, enter, discover), so a longer or shorter
+   translation neither resizes them nor pushes their neighbours. Sized for the longest label of
+   any supported language plus its padding. */
+:root {
+  --size-action-sm: 6.5rem;
+  --size-action-md: 9.5rem;
+  --size-action-lg: 12.5rem;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

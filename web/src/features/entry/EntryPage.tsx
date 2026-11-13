@@ -40,14 +40,14 @@ export function EntryPage() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="hidden sm:inline-flex"
+                className="hidden min-w-(--size-action-sm) sm:inline-flex"
               >
                 <Link to="/login" className="text-foreground! no-underline!">
                   {t.signIn}
                 </Link>
               </Button>
             )}
-            <Button asChild size="sm">
+            <Button asChild size="sm" className="min-w-(--size-action-md)">
               <Link to={enterTo} className="text-primary-foreground! no-underline!">
                 {t.enter}
               </Link>
@@ -71,7 +71,7 @@ export function EntryPage() {
               {t.description}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="min-w-(--size-action-lg)">
                 <Link
                   to={enterTo}
                   className="text-primary-foreground! no-underline!"
@@ -79,7 +79,7 @@ export function EntryPage() {
                   {t.enter}
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
+              <Button asChild size="lg" variant="outline" className="min-w-(--size-action-lg)">
                 <a
                   href="#capabilities"
                   className="text-foreground! no-underline!"
