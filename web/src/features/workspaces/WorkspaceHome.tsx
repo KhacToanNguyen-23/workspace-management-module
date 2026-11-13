@@ -17,6 +17,7 @@ import {
   Section,
   Stacked,
   Tag,
+  ScrollList,
 } from "../../shared/components/ui";
 import { useQuery } from "../../shared/lib/api";
 import { ROLE_LABEL, type Person } from "../../shared/lib/types";
@@ -63,33 +64,35 @@ export function WorkspaceHomePage() {
           ) : !people.data ? (
             <Loading />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{tr("Thành viên")}</TableHead>
-                  <TableHead>{tr("Phòng ban")}</TableHead>
-                  <TableHead className="w-32">{tr("Vai trò")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {people.data.length === 0 && (
-                  <EmptyRow colSpan={3}>{tr("Chưa có thành viên.")}</EmptyRow>
-                )}
-                {people.data.map((p) => (
-                  <TableRow key={p.email}>
-                    <TableCell>
-                      <Stacked primary={p.name || p.email} secondary={p.email} />
-                    </TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground">
-                      {p.department || "—"}
-                    </TableCell>
-                    <TableCell className="text-[13px]">
-                      {tr(ROLE_LABEL[p.role])}
-                    </TableCell>
+            <ScrollList>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>{tr("Thành viên")}</TableHead>
+                    <TableHead>{tr("Phòng ban")}</TableHead>
+                    <TableHead className="w-32">{tr("Vai trò")}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {people.data.length === 0 && (
+                    <EmptyRow colSpan={3}>{tr("Chưa có thành viên.")}</EmptyRow>
+                  )}
+                  {people.data.map((p) => (
+                    <TableRow key={p.email}>
+                      <TableCell>
+                        <Stacked primary={p.name || p.email} secondary={p.email} />
+                      </TableCell>
+                      <TableCell className="text-[13px] text-muted-foreground">
+                        {p.department || "—"}
+                      </TableCell>
+                      <TableCell className="text-[13px]">
+                        {tr(ROLE_LABEL[p.role])}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollList>
           )}
         </Section>
       </PageBody>

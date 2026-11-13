@@ -44,6 +44,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -62,6 +63,7 @@ import { WorkspaceHomePage } from "../features/workspaces/WorkspaceHome";
 import { HyperSpaceMark } from "../shared/components/Brand";
 import { ErrorBox, Loading } from "../shared/components/ui";
 import { useQuery } from "../shared/lib/api";
+import { useCount } from "../shared/lib/pending";
 import type { Me, WorkspaceView } from "../shared/lib/types";
 import { toWorkspaceInfo } from "../shared/lib/types";
 import { GLOBAL_ROLE_LABEL } from "../shared/lib/types";
@@ -174,33 +176,60 @@ function NavItem({
   icon: Icon,
   label,
   end,
+  count = 0,
+  countLabel,
 }: {
   to: string;
   icon: LucideIcon;
   label: string;
   end?: boolean;
+  /** Items waiting for this user's decision; shown as a badge when above zero. */
+  count?: number;
+  /** Accessible wording for the count, e.g. "3 chờ duyệt". */
+  countLabel?: string;
 }) {
   const { pathname } = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const active = !!matchPath({ path: to, end: end ?? false }, pathname);
+  const shown = count > 99 ? "99+" : String(count);
+  const fullLabel = count > 0 && countLabel ? `${label} (${countLabel})` : label;
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
         asChild
         isActive={active}
-        tooltip={label}
-        className="data-[active=true]:bg-(--sidebar-active)"
+        tooltip={fullLabel}
+        className={cn(
+          "data-[active=true]:bg-(--sidebar-active)",
+          count > 0 && "pr-10",
+        )}
       >
         <NavLink
           to={to}
           end={end}
+          aria-label={fullLabel}
           onClick={() => isMobile && setOpenMobile(false)}
-          className="text-[13px] text-sidebar-foreground"
+          className="relative text-[13px] text-sidebar-foreground"
         >
           <Icon className="text-sidebar-foreground/60 [[data-active=true]_&]:text-sky-300" />
           <span>{label}</span>
+          {count > 0 && (
+            // Collapsed sidebar: the number badge is hidden, so mark the icon with a dot.
+            <span
+              aria-hidden
+              className="absolute top-1.5 left-5 hidden size-2 rounded-full bg-amber-400 ring-2 ring-sidebar group-data-[collapsible=icon]:block"
+            />
+          )}
         </NavLink>
       </SidebarMenuButton>
+      {count > 0 && (
+        <SidebarMenuBadge
+          aria-hidden
+          className="rounded-full bg-amber-400 font-semibold text-[#0f2339] peer-hover/menu-button:text-[#0f2339] peer-data-[active=true]/menu-button:text-[#0f2339]"
+        >
+          {shown}
+        </SidebarMenuBadge>
+      )}
     </SidebarMenuItem>
   );
 }
@@ -241,6 +270,18 @@ function AppSidebar() {
     !!wid &&
     (me.user.isAdmin ||
       !!me.memberships.find((m) => m.workspace.id === wid)?.canManage);
+  // Requests waiting for a decision by this user. A member's own pending requests are not counted:
+  // there is nothing for them to act on.
+  const joinRequests = useCount(
+    canManageCurrent ? `/workspaces/${wid}/members?status=pending` : null,
+  );
+  const downloadRequests = useCount(
+    canManageCurrent ? `/workspaces/${wid}/download-requests?status=pending` : null,
+  );
+  const workspaceRequests = useCount(
+    me.user.isAdmin ? "/workspace-requests?status=pending" : null,
+  );
+  const waiting = (n: number) => tr("{count} chờ duyệt", { count: n });
   return (
     <Sidebar
       collapsible="icon"
@@ -283,12 +324,16 @@ function AppSidebar() {
                   to={`/w/${wid}/downloads`}
                   icon={FileDown}
                   label={tr("Yêu cầu download")}
+                  count={downloadRequests}
+                  countLabel={waiting(downloadRequests)}
                 />
                 {canManageCurrent && (
                   <NavItem
                     to={`/w/${wid}/members`}
                     icon={Users}
                     label={tr("Quản lý workspace")}
+                    count={joinRequests}
+                    countLabel={waiting(joinRequests)}
                   />
                 )}
               </SidebarMenu>
@@ -303,7 +348,13 @@ function AppSidebar() {
             <SidebarMenu>
               <NavItem to="/onboarding" icon={UserPlus} label={tr("Tất cả workspace")} />
               {me.user.isAdmin && (
-                <NavItem to="/admin" icon={Shield} label={tr("Quản trị")} />
+                <NavItem
+                  to="/admin"
+                  icon={Shield}
+                  label={tr("Quản trị")}
+                  count={workspaceRequests}
+                  countLabel={waiting(workspaceRequests)}
+                />
               )}
             </SidebarMenu>
           </SidebarGroupContent>

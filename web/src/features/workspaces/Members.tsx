@@ -30,6 +30,7 @@ import {
   fmtShort,
   useAction,
   useAsk,
+  ScrollList,
 } from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
 import {
@@ -139,60 +140,62 @@ export function MembersPage() {
           {!members.data ? (
             <Loading />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{tr("Người xin")}</TableHead>
-                  <TableHead>{tr("Lời nhắn")}</TableHead>
-                  <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
-                  <TableHead className="w-44">
-                    <span className="sr-only">{tr("Thao tác")}</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pending.length === 0 && (
-                  <EmptyRow colSpan={4}>{tr("Không có yêu cầu nào.")}</EmptyRow>
-                )}
-                {pending.map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell>
-                      <Stacked
-                        primary={m.name || m.email}
-                        secondary={`${m.email}${m.department ? ` · ${m.department}` : ""}`}
-                      />
-                    </TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground">
-                      {m.note || "—"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
-                      {fmtShort(m.requestedAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1.5">
-                        <Button
-                          className="min-w-(--size-action-sm)"
-                          size="sm"
-                          disabled={act.busy}
-                          onClick={() => decide(m.id, "approved")}
-                        >
-                          {tr("Duyệt")}
-                        </Button>
-                        <Button
-                          className="min-w-(--size-action-sm)"
-                          size="sm"
-                          variant="outline"
-                          disabled={act.busy}
-                          onClick={() => void reject(m)}
-                        >
-                          {tr("Từ chối")}
-                        </Button>
-                      </div>
-                    </TableCell>
+            <ScrollList>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>{tr("Người xin")}</TableHead>
+                    <TableHead>{tr("Lời nhắn")}</TableHead>
+                    <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                    <TableHead className="w-44">
+                      <span className="sr-only">{tr("Thao tác")}</span>
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {pending.length === 0 && (
+                    <EmptyRow colSpan={4}>{tr("Không có yêu cầu nào.")}</EmptyRow>
+                  )}
+                  {pending.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell>
+                        <Stacked
+                          primary={m.name || m.email}
+                          secondary={`${m.email}${m.department ? ` · ${m.department}` : ""}`}
+                        />
+                      </TableCell>
+                      <TableCell className="text-[13px] text-muted-foreground">
+                        {m.note || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                        {fmtShort(m.requestedAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            className="min-w-(--size-action-sm)"
+                            size="sm"
+                            disabled={act.busy}
+                            onClick={() => decide(m.id, "approved")}
+                          >
+                            {tr("Duyệt")}
+                          </Button>
+                          <Button
+                            className="min-w-(--size-action-sm)"
+                            size="sm"
+                            variant="outline"
+                            disabled={act.busy}
+                            onClick={() => void reject(m)}
+                          >
+                            {tr("Từ chối")}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollList>
           )}
         </Section>
 
@@ -220,95 +223,99 @@ export function MembersPage() {
             />
             <Button className="min-w-(--size-action-sm)" disabled={act.busy || !email}>{tr("Thêm")}</Button>
           </form>
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{tr("Thành viên")}</TableHead>
-                <TableHead className="w-40">{tr("Danh bạ")}</TableHead>
-                <TableHead className="w-28">{tr("Vai trò")}</TableHead>
-                <TableHead>{tr("Duyệt bởi")}</TableHead>
-                <TableHead className="w-10">
-                  <span className="sr-only">{tr("Thao tác")}</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.data && approved.length === 0 && (
-                <EmptyRow colSpan={5}>{tr("Chưa có thành viên.")}</EmptyRow>
-              )}
-              {approved.map((m) => {
-                const locked =
-                  (m.email === me.user.email && !me.user.isAdmin) ||
-                  (m.role === "manager" && !me.user.isAdmin);
-                return (
-                  <TableRow key={m.id}>
-                    <TableCell>
-                      <Stacked primary={m.name || m.email} secondary={m.email} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge value={m.directoryStatus} />
-                    </TableCell>
-                    <TableCell className="text-[13px]">
-                      {tr(ROLE_LABEL[m.role])}
-                    </TableCell>
-                    <TableCell>
-                      <Stacked
-                        primary={
-                          <span className="font-normal">
-                            {m.decidedBy || "—"}
-                          </span>
-                        }
-                        secondary={fmtShort(m.decidedAt)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {!locked && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={tr("Thao tác với {email}", { email: m.email })}
-                            >
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              variant="destructive"
-                              disabled={act.busy}
-                              onSelect={() => void revoke(m)}
-                            >
-                              {tr("Thu hồi quyền")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <ScrollList>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{tr("Thành viên")}</TableHead>
+                  <TableHead className="w-40">{tr("Danh bạ")}</TableHead>
+                  <TableHead className="w-28">{tr("Vai trò")}</TableHead>
+                  <TableHead>{tr("Duyệt bởi")}</TableHead>
+                  <TableHead className="w-10">
+                    <span className="sr-only">{tr("Thao tác")}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {members.data && approved.length === 0 && (
+                  <EmptyRow colSpan={5}>{tr("Chưa có thành viên.")}</EmptyRow>
+                )}
+                {approved.map((m) => {
+                  const locked =
+                    (m.email === me.user.email && !me.user.isAdmin) ||
+                    (m.role === "manager" && !me.user.isAdmin);
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell>
+                        <Stacked primary={m.name || m.email} secondary={m.email} />
+                      </TableCell>
+                      <TableCell>
+                        <Badge value={m.directoryStatus} />
+                      </TableCell>
+                      <TableCell className="text-[13px]">
+                        {tr(ROLE_LABEL[m.role])}
+                      </TableCell>
+                      <TableCell>
+                        <Stacked
+                          primary={
+                            <span className="font-normal">
+                              {m.decidedBy || "—"}
+                            </span>
+                          }
+                          secondary={fmtShort(m.decidedAt)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {!locked && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={tr("Thao tác với {email}", { email: m.email })}
+                              >
+                                <MoreHorizontal />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                variant="destructive"
+                                disabled={act.busy}
+                                onSelect={() => void revoke(m)}
+                              >
+                                {tr("Thu hồi quyền")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollList>
           {past.length > 0 && (
             <details className="group border-t py-2 text-[13px]">
               <summary className="cursor-pointer py-1 text-muted-foreground hover:text-foreground">
                 {tr("Đã từ chối / thu hồi ({count})", { count: past.length })}
               </summary>
-              <ul className="divide-y">
-                {past.map((m) => (
-                  <li
-                    key={m.id}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
-                  >
-                    <span>{m.email}</span>
-                    <Badge value={m.status} />
-                    <span className="text-muted-foreground">
-                      {m.decisionNote || "—"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <ScrollList>
+                <ul className="divide-y">
+                  {past.map((m) => (
+                    <li
+                      key={m.id}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
+                    >
+                      <span>{m.email}</span>
+                      <Badge value={m.status} />
+                      <span className="text-muted-foreground">
+                        {m.decisionNote || "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollList>
             </details>
           )}
         </Section>
