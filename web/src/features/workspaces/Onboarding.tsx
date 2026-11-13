@@ -27,6 +27,7 @@ import {
 import { useApi, useQuery } from "../../shared/lib/api";
 import { ROLE_LABEL, type WorkspaceSummary } from "../../shared/lib/types";
 import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog";
+import { useTr } from "../entry/i18n";
 
 /**
  * All workspaces in one place: join an existing one (a manager of that workspace approves it) or
@@ -34,6 +35,7 @@ import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog";
  * admin approves.
  */
 export function OnboardingPage() {
+  const tr = useTr();
   const api = useApi();
   const navigate = useNavigate();
   const { me, reload: reloadMe } = useMe();
@@ -60,13 +62,14 @@ export function OnboardingPage() {
             disabled={!canCreateDirectly && requestPending}
             title={
               !canCreateDirectly && requestPending
-                ? "Bạn đang có một yêu cầu chờ duyệt"
+                ? tr("Bạn đang có một yêu cầu chờ duyệt")
                 : undefined
             }
+            className="min-w-(--size-action-lg)"
             onClick={() => setDialogOpen(true)}
           >
             <Plus />
-            {canCreateDirectly ? "Tạo workspace" : "Xin tạo workspace"}
+            {canCreateDirectly ? tr("Tạo workspace") : tr("Xin tạo workspace")}
           </Button>
         }
       />
@@ -74,7 +77,7 @@ export function OnboardingPage() {
         <ErrorBox error={act.error ?? list.error} />
 
         {request && (
-          <Section title="Yêu cầu tạo workspace">
+          <Section title={tr("Yêu cầu tạo workspace")}>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-[13px]">
               <span className="font-medium">{request.name}</span>
               <Tag>{request.type}</Tag>
@@ -98,7 +101,7 @@ export function OnboardingPage() {
                       .then(refresh)
                   }
                 >
-                  Rút yêu cầu
+                  {tr("Rút yêu cầu")}
                 </Button>
               )}
             </div>
@@ -106,17 +109,17 @@ export function OnboardingPage() {
         )}
 
         {me.memberships.length > 0 && (
-          <Section title="Yêu cầu tham gia của tôi" count={me.memberships.length}>
+          <Section title={tr("Yêu cầu tham gia của tôi")} count={me.memberships.length}>
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Workspace</TableHead>
-                  <TableHead className="w-28">Vai trò</TableHead>
-                  <TableHead className="w-28">Trạng thái</TableHead>
-                  <TableHead className="w-36">Gửi lúc</TableHead>
-                  <TableHead>Ghi chú duyệt</TableHead>
+                  <TableHead className="w-28">{tr("Vai trò")}</TableHead>
+                  <TableHead className="w-28">{tr("Trạng thái")}</TableHead>
+                  <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                  <TableHead>{tr("Ghi chú duyệt")}</TableHead>
                   <TableHead className="w-28">
-                    <span className="sr-only">Thao tác</span>
+                    <span className="sr-only">{tr("Thao tác")}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -133,7 +136,7 @@ export function OnboardingPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-[13px]">
-                      {ROLE_LABEL[m.role]}
+                      {tr(ROLE_LABEL[m.role])}
                     </TableCell>
                     <TableCell>
                       <Badge value={m.status} />
@@ -161,7 +164,7 @@ export function OnboardingPage() {
                               .then(refresh)
                           }
                         >
-                          Rút yêu cầu
+                          {tr("Rút yêu cầu")}
                         </Button>
                       )}
                     </TableCell>
@@ -172,14 +175,14 @@ export function OnboardingPage() {
           </Section>
         )}
 
-        <Section title="Tất cả workspace" count={list.data?.length}>
+        <Section title={tr("Tất cả workspace")} count={list.data?.length}>
           {!list.data ? (
             <Loading />
           ) : list.data.length === 0 ? (
             <Empty>
               {canCreateDirectly
-                ? "Chưa có workspace nào. Hãy tạo workspace đầu tiên."
-                : "Chưa có workspace nào để tham gia. Bạn có thể xin tạo workspace mới."}
+                ? tr("Chưa có workspace nào. Hãy tạo workspace đầu tiên.")
+                : tr("Chưa có workspace nào để tham gia. Bạn có thể xin tạo workspace mới.")}
             </Empty>
           ) : (
             <ul className="divide-y">
@@ -200,18 +203,18 @@ export function OnboardingPage() {
                         {w.myStatus && <Badge value={w.myStatus} />}
                       </div>
                       <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                        {w.description || "Không có mô tả."}
+                        {w.description || tr("Không có mô tả.")}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {w.memberCount} thành viên · Quản lý:{" "}
-                        {w.managers.join(", ") || "chưa có"}
+                        {tr("{count} thành viên · Quản lý:", { count: w.memberCount })}{" "}
+                        {w.managers.join(", ") || tr("chưa có")}
                       </p>
                     </div>
                     {canRequest && (
                       <div className="flex gap-2 lg:w-96">
                         <Input
-                          aria-label={`Lời nhắn cho manager của ${w.name}`}
-                          placeholder="Lời nhắn cho manager (tuỳ chọn)"
+                          aria-label={tr("Lời nhắn cho manager của {name}", { name: w.name })}
+                          placeholder={tr("Lời nhắn cho manager (tuỳ chọn)")}
                           value={notes[w.id] ?? ""}
                           onChange={(e) =>
                             setNotes({ ...notes, [w.id]: e.target.value })
@@ -219,6 +222,7 @@ export function OnboardingPage() {
                           className="h-8 flex-1 text-[13px]"
                         />
                         <Button
+                          className="min-w-(--size-action-md)"
                           size="sm"
                           disabled={act.busy}
                           onClick={() =>
@@ -231,7 +235,7 @@ export function OnboardingPage() {
                               .then(refresh)
                           }
                         >
-                          Xin tham gia
+                          {tr("Xin tham gia")}
                         </Button>
                       </div>
                     )}

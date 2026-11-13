@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { translate, type Lang, type Vars } from "../../shared/lib/translate";
 
-export type Lang = "vi" | "en";
+export type { Lang } from "../../shared/lib/translate";
 
 const KEY = "hyperspace-lang";
 
@@ -80,8 +89,15 @@ function initialLang(): Lang {
   return navigator.language?.toLowerCase().startsWith("vi") ? "vi" : "en";
 }
 
-/** Entry and login pages: Vietnamese / English, remembered per browser. */
-export function useLang() {
+interface LangState {
+  lang: Lang;
+  setLang: (lang: Lang) => void;
+}
+
+const LangContext = createContext<LangState | null>(null);
+
+/** One language for the whole app, remembered per browser and mirrored on <html lang>. */
+export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(initialLang);
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -91,8 +107,22 @@ export function useLang() {
     try {
       localStorage.setItem(KEY, next);
     } catch {
-      /* not persisted; the choice still applies to this page */
+      /* not persisted; the choice still applies until reload */
     }
   }, []);
-  return { lang, setLang, t: dict[lang] as Copy };
+  const value = useMemo(() => ({ lang, setLang }), [lang, setLang]);
+  return <LangContext.Provider value={value}>{children}</LangContext.Provider>;
+}
+
+/** Language state plus the entry/login copy. */
+export function useLang() {
+  const ctx = useContext(LangContext);
+  if (!ctx) throw new Error("useLang needs a LangProvider");
+  return { lang: ctx.lang, setLang: ctx.setLang, t: dict[ctx.lang] as Copy };
+}
+
+/** Translator for in-app strings: tr("Vietnamese text", { placeholder: value }). */
+export function useTr() {
+  const { lang } = useLang();
+  return useCallback((vi: string, vars?: Vars) => translate(lang, vi, vars), [lang]);
 }

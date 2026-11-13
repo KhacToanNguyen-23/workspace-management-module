@@ -20,9 +20,11 @@ import {
 } from "../../shared/components/ui";
 import { useQuery } from "../../shared/lib/api";
 import { ROLE_LABEL, type Person } from "../../shared/lib/types";
+import { useTr } from "../entry/i18n";
 
 /** Workspace overview: identity, description and the member directory. */
 export function WorkspaceHomePage() {
+  const tr = useTr();
   const { info } = useWorkspace();
   const { me } = useMe();
   const { hash } = useLocation();
@@ -35,9 +37,9 @@ export function WorkspaceHomePage() {
   if (hash === "#downloads") return <Navigate to="downloads" replace />;
 
   const myRole = info.role
-    ? ROLE_LABEL[info.role]
+    ? tr(ROLE_LABEL[info.role])
     : me.user.isAdmin
-      ? "Quản trị viên"
+      ? tr("Quản trị viên")
       : "—";
 
   return (
@@ -47,15 +49,15 @@ export function WorkspaceHomePage() {
         sub={
           <span className="flex items-center gap-2">
             <Tag>{info.workspace.type}</Tag>
-            <span>Vai trò: {myRole}</span>
+            <span>{tr("Vai trò: {role}", { role: myRole })}</span>
           </span>
         }
       />
       <PageBody>
         <p className="mb-8 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-          {info.workspace.description || "Không có mô tả."}
+          {info.workspace.description || tr("Không có mô tả.")}
         </p>
-        <Section title="Thành viên" count={people.data?.length}>
+        <Section title={tr("Thành viên")} count={people.data?.length}>
           {people.error ? (
             <ErrorBox error={people.error} />
           ) : !people.data ? (
@@ -64,14 +66,14 @@ export function WorkspaceHomePage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Thành viên</TableHead>
-                  <TableHead>Phòng ban</TableHead>
-                  <TableHead className="w-32">Vai trò</TableHead>
+                  <TableHead>{tr("Thành viên")}</TableHead>
+                  <TableHead>{tr("Phòng ban")}</TableHead>
+                  <TableHead className="w-32">{tr("Vai trò")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {people.data.length === 0 && (
-                  <EmptyRow colSpan={3}>Chưa có thành viên.</EmptyRow>
+                  <EmptyRow colSpan={3}>{tr("Chưa có thành viên.")}</EmptyRow>
                 )}
                 {people.data.map((p) => (
                   <TableRow key={p.email}>
@@ -82,7 +84,7 @@ export function WorkspaceHomePage() {
                       {p.department || "—"}
                     </TableCell>
                     <TableCell className="text-[13px]">
-                      {ROLE_LABEL[p.role]}
+                      {tr(ROLE_LABEL[p.role])}
                     </TableCell>
                   </TableRow>
                 ))}

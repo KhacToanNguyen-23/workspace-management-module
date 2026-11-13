@@ -39,6 +39,7 @@ import {
 } from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
 import type { DownloadRequest } from "../../shared/lib/types";
+import { useTr } from "../entry/i18n";
 
 const STATUS_FILTER = [
   { value: "", label: "Mọi trạng thái" },
@@ -59,6 +60,7 @@ function matches(r: DownloadRequest, q: string, status: string) {
 
 /** Paper download requests: send one, follow my own, and (managers) work the queue. */
 export function DownloadsPage() {
+  const tr = useTr();
   const { info } = useWorkspace();
   const api = useApi();
   const act = useAction();
@@ -84,14 +86,14 @@ export function DownloadsPage() {
     const decisionNote = await ask(
       decision === "approve"
         ? {
-            title: "Duyệt yêu cầu download",
-            noteLabel: "Ghi chú cho thành viên",
-            confirmLabel: "Duyệt",
+            title: tr("Duyệt yêu cầu download"),
+            noteLabel: tr("Ghi chú cho thành viên"),
+            confirmLabel: tr("Duyệt"),
           }
         : {
-            title: "Từ chối yêu cầu download",
-            noteLabel: "Lý do từ chối",
-            confirmLabel: "Từ chối",
+            title: tr("Từ chối yêu cầu download"),
+            noteLabel: tr("Lý do từ chối"),
+            confirmLabel: tr("Từ chối"),
             destructive: true,
           },
     );
@@ -116,7 +118,7 @@ export function DownloadsPage() {
   return (
     <>
       <PageHeader
-        title="Yêu cầu download"
+        title={tr("Yêu cầu download")}
         sub={info.workspace.name}
         actions={
           <>
@@ -127,18 +129,18 @@ export function DownloadsPage() {
               />
               <Input
                 type="search"
-                aria-label="Tìm yêu cầu"
-                placeholder="Tìm paper, người gửi…"
+                aria-label={tr("Tìm yêu cầu")}
+                placeholder={tr("Tìm paper, người gửi…")}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 className="h-8 w-56 pl-8 text-[13px]"
               />
             </div>
             <SelectField
-              aria-label="Lọc theo trạng thái"
+              aria-label={tr("Lọc theo trạng thái")}
               value={status}
               onChange={setStatus}
-              options={STATUS_FILTER}
+              options={STATUS_FILTER.map((o) => ({ ...o, label: tr(o.label) }))}
             />
           </>
         }
@@ -151,16 +153,16 @@ export function DownloadsPage() {
           />
           <Input
             type="search"
-            aria-label="Tìm yêu cầu"
-            placeholder="Tìm paper, người gửi…"
+            aria-label={tr("Tìm yêu cầu")}
+            placeholder={tr("Tìm paper, người gửi…")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="h-9 pl-8"
           />
         </div>
         <Section
-          title="Gửi yêu cầu paper"
-          description="Gửi DOI, URL hoặc tiêu đề để manager xem xét. Chức năng này không tạo file hay link tải."
+          title={tr("Gửi yêu cầu paper")}
+          description={tr("Gửi DOI, URL hoặc tiêu đề để manager xem xét. Chức năng này không tạo file hay link tải.")}
         >
           <form
             className="grid gap-2 pt-3"
@@ -181,28 +183,28 @@ export function DownloadsPage() {
             }}
           >
             <label htmlFor="paper-ref" className="sr-only">
-              DOI / URL / tiêu đề paper
+              {tr("DOI / URL / tiêu đề paper")}
             </label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="paper-ref"
                 required
                 maxLength={500}
-                placeholder="DOI / URL / tiêu đề paper"
+                placeholder={tr("DOI / URL / tiêu đề paper")}
                 value={paperRef}
                 onChange={(e) => setPaperRef(e.target.value)}
                 className="h-9 flex-1"
               />
-              <Button type="submit" disabled={act.busy} className="h-9">
-                Gửi yêu cầu
+              <Button type="submit" disabled={act.busy} className="h-9 min-w-(--size-action-md)">
+                {tr("Gửi yêu cầu")}
               </Button>
             </div>
             {showNote ? (
               <Textarea
-                aria-label="Ghi chú (tuỳ chọn)"
+                aria-label={tr("Ghi chú (tuỳ chọn)")}
                 maxLength={1000}
                 rows={2}
-                placeholder="Ghi chú cho manager (tuỳ chọn)"
+                placeholder={tr("Ghi chú cho manager (tuỳ chọn)")}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 className="min-h-16 text-[13px]"
@@ -215,14 +217,14 @@ export function DownloadsPage() {
                 className="w-fit px-0 text-muted-foreground"
                 onClick={() => setShowNote(true)}
               >
-                + Thêm ghi chú
+                {tr("+ Thêm ghi chú")}
               </Button>
             )}
             <ErrorBox error={act.error} />
           </form>
         </Section>
 
-        <Section title="Yêu cầu của tôi" count={mine.data?.length}>
+        <Section title={tr("Yêu cầu của tôi")} count={mine.data?.length}>
           {mine.error ? (
             <ErrorBox error={mine.error} />
           ) : !mine.data ? (
@@ -232,11 +234,11 @@ export function DownloadsPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Paper</TableHead>
-                  <TableHead className="w-36">Gửi lúc</TableHead>
-                  <TableHead className="w-28">Trạng thái</TableHead>
-                  <TableHead>Ghi chú manager</TableHead>
+                  <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                  <TableHead className="w-28">{tr("Trạng thái")}</TableHead>
+                  <TableHead>{tr("Ghi chú manager")}</TableHead>
                   <TableHead className="w-10">
-                    <span className="sr-only">Thao tác</span>
+                    <span className="sr-only">{tr("Thao tác")}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -244,8 +246,8 @@ export function DownloadsPage() {
                 {myRows.length === 0 && (
                   <EmptyRow colSpan={5}>
                     {mine.data.length === 0
-                      ? "Chưa có yêu cầu."
-                      : "Không có yêu cầu khớp bộ lọc."}
+                      ? tr("Chưa có yêu cầu.")
+                      : tr("Không có yêu cầu khớp bộ lọc.")}
                   </EmptyRow>
                 )}
                 {myRows.map((r) => (
@@ -271,20 +273,20 @@ export function DownloadsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
-                                  aria-label="Thao tác"
+                                  aria-label={tr("Thao tác")}
                                 >
                                   <MoreHorizontal />
                                 </Button>
                               </DropdownMenuTrigger>
                             </TooltipTrigger>
-                            <TooltipContent>Thao tác</TooltipContent>
+                            <TooltipContent>{tr("Thao tác")}</TooltipContent>
                           </Tooltip>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               disabled={act.busy}
                               onSelect={() => withdraw(r.id)}
                             >
-                              Rút yêu cầu
+                              {tr("Rút yêu cầu")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -298,7 +300,7 @@ export function DownloadsPage() {
         </Section>
 
         {info.canManage && (
-          <Section title="Hàng đợi duyệt" count={queue.data?.length}>
+          <Section title={tr("Hàng đợi duyệt")} count={queue.data?.length}>
             {queue.error ? (
               <ErrorBox error={queue.error} />
             ) : !queue.data ? (
@@ -308,11 +310,11 @@ export function DownloadsPage() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Paper</TableHead>
-                    <TableHead>Người yêu cầu</TableHead>
-                    <TableHead className="w-36">Gửi lúc</TableHead>
-                    <TableHead className="w-28">Trạng thái</TableHead>
+                    <TableHead>{tr("Người yêu cầu")}</TableHead>
+                    <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                    <TableHead className="w-28">{tr("Trạng thái")}</TableHead>
                     <TableHead className="w-44 text-right">
-                      <span className="sr-only">Thao tác</span>
+                      <span className="sr-only">{tr("Thao tác")}</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -320,8 +322,8 @@ export function DownloadsPage() {
                   {queueRows.length === 0 && (
                     <EmptyRow colSpan={5}>
                       {queue.data.length === 0
-                        ? "Không có yêu cầu chờ duyệt."
-                        : "Không có yêu cầu khớp bộ lọc."}
+                        ? tr("Không có yêu cầu chờ duyệt.")
+                        : tr("Không có yêu cầu khớp bộ lọc.")}
                     </EmptyRow>
                   )}
                   {queueRows.map((r) => (
@@ -345,19 +347,21 @@ export function DownloadsPage() {
                         {r.status === "pending" && (
                           <div className="flex justify-end gap-1.5">
                             <Button
+                              className="min-w-(--size-action-sm)"
                               size="sm"
                               disabled={act.busy}
                               onClick={() => void decide(r.id, "approve")}
                             >
-                              Duyệt
+                              {tr("Duyệt")}
                             </Button>
                             <Button
+                              className="min-w-(--size-action-sm)"
                               size="sm"
                               variant="outline"
                               disabled={act.busy}
                               onClick={() => void decide(r.id, "reject")}
                             >
-                              Từ chối
+                              {tr("Từ chối")}
                             </Button>
                           </div>
                         )}

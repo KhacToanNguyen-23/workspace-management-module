@@ -91,6 +91,15 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Minimum widths for buttons with a fixed role, so a longer or shorter translation neither resizes
+   them nor moves their neighbours: sm = row decisions (Approve, Reject, Add), md = form submits
+   and "request to join", lg = the page-level create/request workspace button. */
+:root {
+  --size-action-sm: 5.5rem;
+  --size-action-md: 8rem;
+  --size-action-lg: 11.5rem;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
