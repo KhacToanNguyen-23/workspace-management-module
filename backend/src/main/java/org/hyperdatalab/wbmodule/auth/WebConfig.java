@@ -27,7 +27,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedOrigins(props.corsOrigins().toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("authorization", "content-type")
-                .exposedHeaders("WWW-Authenticate")
+                .exposedHeaders("WWW-Authenticate", "Location", "Link", "X-Total-Count")
                 .maxAge(600);
     }
 

@@ -11,9 +11,9 @@ class ListingApiTest extends IntegrationTest {
     @Test
     void memberSeesExistingWorkspacesWithManagersAndOwnStatus() throws Exception {
         String wid = seedWorkspace("research");
-        call("POST", "/api/workspaces/" + wid + "/join", ALICE, Map.of("note", "hi"));
+        call("PUT", "/api/v1/workspaces/" + wid + "/members/me", ALICE, Map.of("note", "hi"));
 
-        var response = get("/api/workspaces", ALICE);
+        var response = get("/api/v1/workspaces", ALICE);
 
         assertThat(response.status()).isEqualTo(200);
         assertThat(response.body()).hasSize(1);
@@ -28,7 +28,7 @@ class ListingApiTest extends IntegrationTest {
     void adminSeesExistingWorkspacesWithCreationDate() throws Exception {
         seedWorkspace("review");
 
-        var response = get("/api/admin/workspaces", ADMIN);
+        var response = get("/api/v1/workspaces?status=all", ADMIN);
 
         assertThat(response.status()).isEqualTo(200);
         assertThat(response.body()).hasSize(1);
@@ -40,12 +40,12 @@ class ListingApiTest extends IntegrationTest {
         String wid = seedWorkspace("research");
         joinAndApprove(wid, ALICE, "member");
 
-        var members = get("/api/w/" + wid + "/members?status=approved", MANAGER).body();
+        var members = get("/api/v1/workspaces/" + wid + "/members?status=approved", MANAGER).body();
         var alice = members.get(0).path("email").asText().equals(ALICE) ? members.get(0) : members.get(1);
 
         assertThat(alice.path("requestedAt").asText()).startsWith("20");
         assertThat(alice.path("decidedAt").asText()).startsWith("20");
-        assertThat(get("/api/me", ALICE).body().path("memberships").get(0).path("requestedAt").asText())
+        assertThat(get("/api/v1/me", ALICE).body().path("memberships").get(0).path("requestedAt").asText())
                 .startsWith("20");
     }
 
@@ -53,10 +53,10 @@ class ListingApiTest extends IntegrationTest {
     void downloadRequestsKeepTheirRequestDate() throws Exception {
         String wid = seedWorkspace("research");
         joinAndApprove(wid, ALICE, "member");
-        call("POST", "/api/w/" + wid + "/download-requests", ALICE, Map.of("paperRef", "doi:1"));
+        call("POST", "/api/v1/workspaces/" + wid + "/download-requests", ALICE, Map.of("paperRef", "doi:1"));
 
-        var mine = get("/api/w/" + wid + "/download-requests/mine", ALICE).body();
-        var queue = get("/api/w/" + wid + "/download-requests", MANAGER).body();
+        var mine = get("/api/v1/workspaces/" + wid + "/download-requests?requester=me", ALICE).body();
+        var queue = get("/api/v1/workspaces/" + wid + "/download-requests", MANAGER).body();
 
         assertThat(mine.get(0).path("requestedAt").asText()).startsWith("20");
         assertThat(queue.get(0).path("requestedAt").asText()).startsWith("20");
@@ -66,12 +66,12 @@ class ListingApiTest extends IntegrationTest {
     void workspaceRequestsKeepTheirRequestDate() throws Exception {
         call(
                 "POST",
-                "/api/workspace-requests",
+                "/api/v1/workspace-requests",
                 ALICE,
                 Map.of("name", "Alice Lab", "type", "research"));
 
-        var mine = get("/api/workspace-requests/mine", ALICE).body();
-        var queue = get("/api/admin/workspace-requests?status=pending", ADMIN).body();
+        var mine = get("/api/v1/workspace-requests?requester=me", ALICE).body();
+        var queue = get("/api/v1/workspace-requests?status=pending", ADMIN).body();
 
         assertThat(mine.get(0).path("requestedAt").asText()).startsWith("20");
         assertThat(queue.get(0).path("requestedAt").asText()).startsWith("20");

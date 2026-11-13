@@ -23,10 +23,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { STATUS_LABEL } from "../lib/types";
+import { useTr } from "../../features/entry/i18n";
 
 export function Loading({ rows = 3 }: { rows?: number }) {
+  const tr = useTr();
   return (
-    <div className="space-y-2 py-3" aria-busy="true" aria-label="Đang tải">
+    <div className="space-y-2 py-3" aria-busy="true" aria-label={tr("Đang tải")}>
       {Array.from({ length: rows }, (_, i) => (
         <Skeleton key={i} className="h-8 w-full" />
       ))}
@@ -62,6 +64,7 @@ const STATUS_TONE: Record<string, string> = {
 
 /** Restrained status: a coloured dot and the Vietnamese label. */
 export function Badge({ value, label }: { value: string; label?: string }) {
+  const tr = useTr();
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-foreground">
       <span
@@ -71,7 +74,7 @@ export function Badge({ value, label }: { value: string; label?: string }) {
           STATUS_TONE[value] ?? "bg-muted-foreground/50",
         )}
       />
-      {label ?? STATUS_LABEL[value] ?? value}
+      {label ?? tr(STATUS_LABEL[value] ?? value)}
     </span>
   );
 }
@@ -190,6 +193,23 @@ export function EmptyRow({
   );
 }
 
+/** Shown under a paged list when the server holds more rows than were loaded. */
+export function TruncationNote({
+  shown,
+  total,
+}: {
+  shown: number | undefined;
+  total: number | null;
+}) {
+  const tr = useTr();
+  if (shown === undefined || total === null || total <= shown) return null;
+  return (
+    <p className="py-2 text-xs text-muted-foreground">
+      {tr("Hiển thị {shown}/{total} dòng. Thu hẹp bộ lọc để xem phần còn lại.", { shown, total })}
+    </p>
+  );
+}
+
 /** Empty state outside a table: one muted line. */
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="py-3 text-[13px] text-muted-foreground">{children}</p>;
@@ -304,6 +324,7 @@ interface AskOptions {
  * (or "" when there is no note box) on confirm, and to null on cancel. Render `dialog` once.
  */
 export function useAsk() {
+  const tr = useTr();
   const [opts, setOpts] = useState<AskOptions | null>(null);
   const [note, setNote] = useState("");
   const resolver = useRef<((v: string | null) => void) | null>(null);
@@ -357,7 +378,7 @@ export function useAsk() {
               size="sm"
               onClick={() => close(null)}
             >
-              Huỷ
+              {tr("Huỷ")}
             </Button>
             <Button
               type="submit"
@@ -365,7 +386,7 @@ export function useAsk() {
               variant={opts?.destructive ? "destructive" : "default"}
               autoFocus={!opts?.noteLabel}
             >
-              {opts?.confirmLabel ?? "Xác nhận"}
+              {opts?.confirmLabel ?? tr("Xác nhận")}
             </Button>
           </DialogFooter>
         </form>

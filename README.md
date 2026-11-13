@@ -68,7 +68,7 @@ Nút **Reset dữ liệu mẫu** ở màn đăng nhập (`POST /api/dev/reset`) 
 ## Test và kiểm tra frontend
 
 Integration test dùng Firestore emulator trong Docker Compose. Dữ liệu các collection nghiệp vụ được xoá trước mỗi test; workspace types được seed lại idempotent lúc ứng dụng khởi động.
-Backend test suite hiện có 73 test, gồm kiểm thử API trên emulator và unit test.
+Backend test suite hiện có 94 test, gồm kiểm thử API trên emulator và unit test.
 
 ```bash
 npm run db:up

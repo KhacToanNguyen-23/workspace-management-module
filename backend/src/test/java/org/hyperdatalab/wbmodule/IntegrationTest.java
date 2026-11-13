@@ -47,9 +47,14 @@ public abstract class IntegrationTest {
         }
     }
 
-    public record Res(int status, JsonNode body) {
+    public record Res(int status, JsonNode body, java.util.Map<String, String> headers) {
         public String code() {
             return body.path("error").path("code").asText();
+        }
+
+        /** First value of a response header (case-insensitive), or null. */
+        public String header(String name) {
+            return headers.get(name.toLowerCase(java.util.Locale.ROOT));
         }
     }
 
@@ -63,9 +68,14 @@ public abstract class IntegrationTest {
             req.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body));
         MvcResult r = mvc.perform(req).andReturn();
         String text = r.getResponse().getContentAsString();
+        java.util.Map<String, String> headers = new java.util.HashMap<>();
+        for (String name : r.getResponse().getHeaderNames())
+            headers.put(
+                    name.toLowerCase(java.util.Locale.ROOT), r.getResponse().getHeader(name));
         return new Res(
                 r.getResponse().getStatus(),
-                text.isEmpty() ? json.nullNode() : json.readTree(text));
+                text.isEmpty() ? json.nullNode() : json.readTree(text),
+                headers);
     }
 
     protected Res get(String path, String as) throws Exception {
@@ -77,7 +87,7 @@ public abstract class IntegrationTest {
         Res r =
                 call(
                         "POST",
-                        "/api/admin/workspaces",
+                        "/api/v1/workspaces",
                         ADMIN,
                         java.util.Map.of(
                                 "name",
@@ -94,17 +104,16 @@ public abstract class IntegrationTest {
      * `who` requests to join and MANAGER approves with the given role; returns the membership id.
      */
     protected String joinAndApprove(String wid, String who, String role) throws Exception {
-        call("POST", "/api/workspaces/" + wid + "/join", who, java.util.Map.of("note", "please"));
-        Res pending = get("/api/w/" + wid + "/members?status=pending", MANAGER);
+        call("PUT", "/api/v1/workspaces/" + wid + "/members/me", who, java.util.Map.of("note", "please"));
+        Res pending = get("/api/v1/workspaces/" + wid + "/members?status=pending", MANAGER);
         String mid = null;
         for (JsonNode m : pending.body())
             if (m.path("email").asText().equals(who)) mid = m.path("id").asText();
         Res ok =
-                call(
-                        "POST",
-                        "/api/w/" + wid + "/members/" + mid + "/approve",
+                call("PATCH",
+                        "/api/v1/workspaces/" + wid + "/members/" + mid,
                         MANAGER,
-                        java.util.Map.of());
+                        java.util.Map.of("status", "approved"));
         if (ok.status() != 200) throw new AssertionError(ok.body().toString());
         return mid;
     }

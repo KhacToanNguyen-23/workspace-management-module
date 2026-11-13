@@ -91,6 +91,32 @@ export interface WorkspaceInfo {
   role: WorkspaceRole | null;
   canManage: boolean;
 }
+/** GET /workspaces/{id}: the workspace plus what the caller may do in it. */
+export interface WorkspaceView {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  status: string;
+  managers: string[];
+  myRole?: WorkspaceRole;
+  canManage: boolean;
+}
+
+export function toWorkspaceInfo(v: WorkspaceView): WorkspaceInfo {
+  return {
+    workspace: {
+      id: v.id,
+      name: v.name,
+      type: v.type,
+      description: v.description,
+      status: v.status,
+    },
+    role: v.myRole ?? null,
+    canManage: v.canManage,
+  };
+}
+
 export interface MemberRow {
   id: string;
   email: string;

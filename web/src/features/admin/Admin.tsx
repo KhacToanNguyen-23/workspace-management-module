@@ -31,6 +31,7 @@ import {
   SelectField,
   Stacked,
   Tag,
+  TruncationNote,
   fmtShort,
   useAction,
   useAsk,
@@ -43,6 +44,7 @@ import {
   type GlobalRole,
   type WorkspaceRequest,
 } from "../../shared/lib/types";
+import { useTr } from "../entry/i18n";
 
 const TABS = [
   { value: "users", label: "Người dùng" },
@@ -52,20 +54,18 @@ const TABS = [
 ] as const;
 
 export function AdminPage() {
+  const tr = useTr();
   const { me } = useMe();
   const [tab, setTab] = useState<string>("users");
   if (!me.user.isAdmin)
     return (
       <PageBody>
-        <ErrorBox error="Chỉ admin mới vào được trang này." />
+        <ErrorBox error={tr("Chỉ admin mới vào được trang này.")} />
       </PageBody>
     );
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-0">
-      <PageHeader
-        title="Quản trị"
-        sub="Người dùng, yêu cầu tạo workspace, workspace và nhật ký."
-      />
+      <PageHeader title={tr("Quản trị")} />
       <div className="overflow-x-auto border-b px-4 md:px-8">
         <TabsList variant="line" className="h-10 gap-4 p-0">
           {TABS.map((t) => (
@@ -74,7 +74,7 @@ export function AdminPage() {
               value={t.value}
               className="flex-none px-0 text-[13px] after:bg-primary group-data-[orientation=horizontal]/tabs:after:bottom-0"
             >
-              {t.label}
+              {tr(t.label)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -102,6 +102,8 @@ const ROLE_OPTIONS = (["member", "workspace_manager", "admin"] as GlobalRole[]).
 );
 
 function UsersTab() {
+  const tr = useTr();
+  const roleOptions = ROLE_OPTIONS.map((o) => ({ ...o, label: tr(o.label) }));
   const api = useApi(),
     act = useAction(),
     { ask, dialog } = useAsk(),
@@ -113,11 +115,12 @@ function UsersTab() {
   if (q) params.set("q", q);
   if (role) params.set("role", role);
   if (disabled) params.set("disabled", disabled);
-  const users = useQuery<AdminUser[]>(`/admin/users?${params}`);
+  params.set("limit", "500");
+  const users = useQuery<AdminUser[]>(`/users?${params}`);
   const patch = (email: string, body: object) =>
     void act
       .run(() =>
-        api("PATCH", `/admin/users/${encodeURIComponent(email)}`, body),
+        api("PATCH", `/users/${encodeURIComponent(email)}`, body),
       )
       .then(users.reload);
   return (
@@ -130,27 +133,27 @@ function UsersTab() {
           />
           <Input
             type="search"
-            aria-label="Tìm người dùng"
-            placeholder="Tìm email / tên"
+            aria-label={tr("Tìm người dùng")}
+            placeholder={tr("Tìm email / tên")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="h-8 w-64 pl-8 text-[13px]"
           />
         </div>
         <SelectField
-          aria-label="Lọc theo role"
+          aria-label={tr("Lọc theo role")}
           value={role}
           onChange={setRole}
-          options={[{ value: "", label: "Mọi role" }, ...ROLE_OPTIONS]}
+          options={[{ value: "", label: tr("Mọi role") }, ...roleOptions]}
         />
         <SelectField
-          aria-label="Lọc theo trạng thái"
+          aria-label={tr("Lọc theo trạng thái")}
           value={disabled}
           onChange={setDisabled}
           options={[
-            { value: "", label: "Mọi trạng thái" },
-            { value: "false", label: "Đang hoạt động" },
-            { value: "true", label: "Đã vô hiệu hoá" },
+            { value: "", label: tr("Mọi trạng thái") },
+            { value: "false", label: tr("Đang hoạt động") },
+            { value: "true", label: tr("Đã vô hiệu hoá") },
           ]}
         />
       </div>
@@ -162,19 +165,19 @@ function UsersTab() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Người dùng</TableHead>
-                <TableHead className="w-40">Danh bạ</TableHead>
+                <TableHead>{tr("Người dùng")}</TableHead>
+                <TableHead className="w-40">{tr("Danh bạ")}</TableHead>
                 <TableHead>Workspace</TableHead>
                 <TableHead className="w-48">Role</TableHead>
-                <TableHead className="w-32">Trạng thái</TableHead>
+                <TableHead className="w-32">{tr("Trạng thái")}</TableHead>
                 <TableHead className="w-10">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{tr("Thao tác")}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.data.length === 0 && (
-                <EmptyRow colSpan={6}>Không có người dùng khớp bộ lọc.</EmptyRow>
+                <EmptyRow colSpan={6}>{tr("Không có người dùng khớp bộ lọc.")}</EmptyRow>
               )}
               {users.data.map((u) => {
                 const locked =
@@ -195,18 +198,18 @@ function UsersTab() {
                     </TableCell>
                     <TableCell>
                       <SelectField
-                        aria-label={`Role của ${u.email}`}
+                        aria-label={tr("Role của {email}", { email: u.email })}
                         value={u.role}
                         disabled={locked}
                         className="w-44"
                         onChange={(value) => patch(u.email, { role: value })}
-                        options={ROLE_OPTIONS}
+                        options={roleOptions}
                       />
                     </TableCell>
                     <TableCell>
                       <Badge
                         value={u.disabled ? "disabled" : "active"}
-                        label={u.disabled ? "Đã vô hiệu hoá" : "Hoạt động"}
+                        label={u.disabled ? tr("Đã vô hiệu hoá") : tr("Hoạt động")}
                       />
                     </TableCell>
                     <TableCell>
@@ -216,7 +219,7 @@ function UsersTab() {
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={`Thao tác với ${u.email}`}
+                              aria-label={tr("Thao tác với {email}", { email: u.email })}
                             >
                               <MoreHorizontal />
                             </Button>
@@ -226,10 +229,10 @@ function UsersTab() {
                               variant={u.disabled ? "default" : "destructive"}
                               onSelect={async () => {
                                 const ok = await ask({
-                                  title: `${u.disabled ? "Mở khoá" : "Vô hiệu hoá"} ${u.email}?`,
+                                  title: tr(u.disabled ? "Mở khoá {email}?" : "Vô hiệu hoá {email}?", { email: u.email }),
                                   confirmLabel: u.disabled
-                                    ? "Mở khoá"
-                                    : "Vô hiệu hoá",
+                                    ? tr("Mở khoá")
+                                    : tr("Vô hiệu hoá"),
                                   destructive: !u.disabled,
                                 });
                                 if (ok !== null)
@@ -249,32 +252,35 @@ function UsersTab() {
           </Table>
         )}
       </div>
+      <TruncationNote shown={users.data?.length} total={users.total} />
       {dialog}
     </>
   );
 }
 
 function RequestsTab() {
+  const tr = useTr();
   const api = useApi(),
     act = useAction(),
     { ask, dialog } = useAsk();
   const q = useQuery<WorkspaceRequest[]>(
-    "/admin/workspace-requests?status=pending",
+    "/workspace-requests?status=pending&limit=500",
   );
   const [edits, setEdits] = useState<Record<string, { name: string }>>({});
   const refresh = () => q.reload();
   const approve = async (r: WorkspaceRequest, e: { name: string }) => {
     const note = await ask({
-      title: `Duyệt workspace "${e.name}"?`,
-      description: "Người yêu cầu sẽ thành quản lý của workspace mới.",
-      noteLabel: "Ghi chú",
-      confirmLabel: "Duyệt",
+      title: tr("Duyệt workspace \"{name}\"?", { name: e.name }),
+      description: tr("Người yêu cầu sẽ thành quản lý của workspace mới."),
+      noteLabel: tr("Ghi chú"),
+      confirmLabel: tr("Duyệt"),
     });
     if (note === null) return;
     void act
       .run(() =>
-        api("POST", `/admin/workspace-requests/${r.id}/approve`, {
+        api("PATCH", `/workspace-requests/${r.id}`, {
           ...e,
+          status: "approved",
           note,
         }),
       )
@@ -282,41 +288,41 @@ function RequestsTab() {
   };
   const reject = async (r: WorkspaceRequest) => {
     const note = await ask({
-      title: `Từ chối yêu cầu "${r.name}"?`,
-      noteLabel: "Lý do từ chối",
-      confirmLabel: "Từ chối",
+      title: tr("Từ chối yêu cầu \"{name}\"?", { name: r.name }),
+      noteLabel: tr("Lý do từ chối"),
+      confirmLabel: tr("Từ chối"),
       destructive: true,
     });
     if (note === null) return;
     void act
       .run(() =>
-        api("POST", `/admin/workspace-requests/${r.id}/reject`, { note }),
+        api("PATCH", `/workspace-requests/${r.id}`, { status: "rejected", note }),
       )
       .then(refresh);
   };
   return (
     <>
       <ErrorBox error={act.error ?? q.error} />
-      <Section title="Đang chờ duyệt" count={q.data?.length}>
+      <Section title={tr("Đang chờ duyệt")} count={q.data?.length}>
         {!q.data ? (
           <Loading />
         ) : (
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Người yêu cầu</TableHead>
-                <TableHead>Tên workspace</TableHead>
-                <TableHead>Chi tiết</TableHead>
-                <TableHead>Lý do</TableHead>
-                <TableHead className="w-36">Gửi lúc</TableHead>
+                <TableHead>{tr("Người yêu cầu")}</TableHead>
+                <TableHead>{tr("Tên workspace")}</TableHead>
+                <TableHead>{tr("Chi tiết")}</TableHead>
+                <TableHead>{tr("Lý do")}</TableHead>
+                <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
                 <TableHead className="w-44">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{tr("Thao tác")}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {q.data.length === 0 && (
-                <EmptyRow colSpan={6}>Không có yêu cầu đang chờ.</EmptyRow>
+                <EmptyRow colSpan={6}>{tr("Không có yêu cầu đang chờ.")}</EmptyRow>
               )}
               {q.data.map((r) => {
                 const e = edits[r.id] ?? { name: r.name };
@@ -330,7 +336,7 @@ function RequestsTab() {
                     </TableCell>
                     <TableCell>
                       <Input
-                        aria-label="Tên workspace (admin có thể sửa trước khi duyệt)"
+                        aria-label={tr("Tên workspace (admin có thể sửa trước khi duyệt)")}
                         value={e.name}
                         onChange={(x) =>
                           setEdits({
@@ -358,19 +364,21 @@ function RequestsTab() {
                     <TableCell>
                       <div className="flex justify-end gap-1.5">
                         <Button
+                          className="min-w-(--size-action-sm)"
                           size="sm"
                           disabled={act.busy}
                           onClick={() => void approve(r, e)}
                         >
-                          Duyệt
+                          {tr("Duyệt")}
                         </Button>
                         <Button
+                          className="min-w-(--size-action-sm)"
                           size="sm"
                           variant="outline"
                           disabled={act.busy}
                           onClick={() => void reject(r)}
                         >
-                          Từ chối
+                          {tr("Từ chối")}
                         </Button>
                       </div>
                     </TableCell>
@@ -391,18 +399,18 @@ interface AdminWorkspace {
   name: string;
   type: string;
   status: string;
-  /** The admin API returns the manager list under this name. */
-  managerEmails?: string[];
+  managers?: string[];
   memberCount: number;
   pendingCount: number;
 }
 
 function WorkspacesTab() {
+  const tr = useTr();
   const api = useApi(),
     act = useAction(),
     { ask, dialog } = useAsk();
-  const list = useQuery<AdminWorkspace[]>("/admin/workspaces");
-  const users = useQuery<AdminUser[]>("/admin/users?disabled=false");
+  const list = useQuery<AdminWorkspace[]>("/workspaces?status=all&limit=500");
+  const users = useQuery<AdminUser[]>("/users?disabled=false&limit=500");
   const types = useQuery<{ code: string; name: string }[]>("/workspace-types");
   const [managerSelections, setManagerSelections] = useState<
     Record<string, string>
@@ -422,9 +430,9 @@ function WorkspacesTab() {
     if (!email) return;
     if (selected?.role === "member") {
       const ok = await ask({
-        title: "Nâng quyền người dùng?",
-        description: "Người này sẽ được nâng lên Quản lý workspace",
-        confirmLabel: "Tiếp tục",
+        title: tr("Nâng quyền người dùng?"),
+        description: tr("Người này sẽ được nâng lên Quản lý workspace"),
+        confirmLabel: tr("Tiếp tục"),
       });
       if (ok === null) return;
     }
@@ -432,7 +440,7 @@ function WorkspacesTab() {
       .run(() =>
         api<{ promoted: boolean }>(
           "POST",
-          `/admin/workspaces/${w.id}/managers`,
+          `/workspaces/${w.id}/managers`,
           { email },
         ),
       )
@@ -440,8 +448,8 @@ function WorkspacesTab() {
         if (result) {
           setPromotionMessage(
             result.promoted
-              ? `${email} đã được nâng lên Quản lý workspace.`
-              : `${email} đã được thêm làm manager.`,
+              ? tr("{email} đã được nâng lên Quản lý workspace.", { email })
+              : tr("{email} đã được thêm làm manager.", { email }),
           );
           setManagerSelections({ ...managerSelections, [w.id]: "" });
           refresh();
@@ -451,14 +459,14 @@ function WorkspacesTab() {
 
   return (
     <>
-      <Section title="Tạo workspace">
+      <Section title={tr("Tạo workspace")}>
         <form
           className="grid gap-3 pt-3 md:grid-cols-[1fr_10rem_1fr_1fr_auto] md:items-end"
           onSubmit={(e) => {
             e.preventDefault();
             void act
               .run(() =>
-                api("POST", "/admin/workspaces", {
+                api("POST", "/workspaces", {
                   ...form,
                   managers: form.managers.split(/[\s,;]+/).filter(Boolean),
                 }),
@@ -466,7 +474,7 @@ function WorkspacesTab() {
               .then(refresh);
           }}
         >
-          <Field label="Tên" htmlFor="aw-name">
+          <Field label={tr("Tên")} htmlFor="aw-name">
             <Input
               id="aw-name"
               required
@@ -475,7 +483,7 @@ function WorkspacesTab() {
               className="h-8 text-[13px]"
             />
           </Field>
-          <Field label="Loại" htmlFor="aw-type">
+          <Field label={tr("Loại")} htmlFor="aw-type">
             <SelectField
               id="aw-type"
               className="w-full"
@@ -487,7 +495,7 @@ function WorkspacesTab() {
               }))}
             />
           </Field>
-          <Field label="Mô tả" htmlFor="aw-desc">
+          <Field label={tr("Mô tả")} htmlFor="aw-desc">
             <Input
               id="aw-desc"
               value={form.description}
@@ -506,7 +514,7 @@ function WorkspacesTab() {
               className="h-8 text-[13px]"
             />
           </Field>
-          <Button size="sm">Tạo</Button>
+          <Button size="sm">{tr("Tạo")}</Button>
         </form>
       </Section>
 
@@ -524,19 +532,19 @@ function WorkspacesTab() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Tên</TableHead>
+                <TableHead>{tr("Tên")}</TableHead>
                 <TableHead>Managers</TableHead>
-                <TableHead className="w-80">Thêm manager</TableHead>
-                <TableHead className="w-32">Thành viên</TableHead>
-                <TableHead className="w-32">Trạng thái</TableHead>
+                <TableHead className="w-80">{tr("Thêm manager")}</TableHead>
+                <TableHead className="w-32">{tr("Thành viên")}</TableHead>
+                <TableHead className="w-32">{tr("Trạng thái")}</TableHead>
                 <TableHead className="w-24">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{tr("Thao tác")}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {list.data.length === 0 && (
-                <EmptyRow colSpan={6}>Chưa có workspace.</EmptyRow>
+                <EmptyRow colSpan={6}>{tr("Chưa có workspace.")}</EmptyRow>
               )}
               {list.data.map((w) => (
                 <TableRow key={w.id}>
@@ -544,13 +552,13 @@ function WorkspacesTab() {
                     <Stacked primary={w.name} secondary={w.type} />
                   </TableCell>
                   <TableCell className="max-w-56 truncate text-[13px] text-muted-foreground">
-                    {(w.managerEmails ?? []).join(", ") || "—"}
+                    {(w.managers ?? []).join(", ") || "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <SelectField
-                        aria-label={`Chọn manager cho ${w.name}`}
-                        placeholder="Chọn người dùng"
+                        aria-label={tr("Chọn manager cho {name}", { name: w.name })}
+                        placeholder={tr("Chọn người dùng")}
                         className="w-56"
                         value={managerSelections[w.id] ?? ""}
                         onChange={(value) =>
@@ -560,19 +568,20 @@ function WorkspacesTab() {
                           })
                         }
                         options={(users.data ?? [])
-                          .filter((user) => !w.managerEmails?.includes(user.email))
+                          .filter((user) => !w.managers?.includes(user.email))
                           .map((user) => ({
                             value: user.email,
                             label: `${user.name || user.email} (${user.role})`,
                           }))}
                       />
                       <Button
+                        className="min-w-(--size-action-sm)"
                         size="sm"
                         variant="outline"
                         disabled={!managerSelections[w.id] || act.busy}
                         onClick={() => void addManager(w)}
                       >
-                        Thêm
+                        {tr("Thêm")}
                       </Button>
                     </div>
                   </TableCell>
@@ -580,7 +589,7 @@ function WorkspacesTab() {
                     {w.memberCount}
                     <span className="text-muted-foreground">
                       {" "}
-                      · {w.pendingCount} chờ
+                      · {tr("{count} chờ", { count: w.pendingCount })}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -594,7 +603,7 @@ function WorkspacesTab() {
                       onClick={() =>
                         void act
                           .run(() =>
-                            api("PATCH", `/admin/workspaces/${w.id}`, {
+                            api("PATCH", `/workspaces/${w.id}`, {
                               status:
                                 w.status === "active" ? "archived" : "active",
                             }),
@@ -602,7 +611,7 @@ function WorkspacesTab() {
                           .then(refresh)
                       }
                     >
-                      {w.status === "active" ? "Lưu trữ" : "Mở lại"}
+                      {w.status === "active" ? tr("Lưu trữ") : tr("Mở lại")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -617,13 +626,14 @@ function WorkspacesTab() {
 }
 
 function AuditTab() {
-  const q = useQuery<AuditRow[]>("/admin/audit?limit=300");
+  const q = useQuery<AuditRow[]>("/audit-events?limit=300");
   return (
     <>
       <ErrorBox error={q.error} />
       <div className="border-t">
         <AuditTable rows={q.data} />
       </div>
+      <TruncationNote shown={q.data?.length} total={q.total} />
     </>
   );
 }

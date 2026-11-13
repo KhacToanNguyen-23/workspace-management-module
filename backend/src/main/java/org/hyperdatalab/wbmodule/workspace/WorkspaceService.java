@@ -8,12 +8,14 @@ import com.google.cloud.firestore.Transaction;
 import org.hyperdatalab.wbmodule.auth.AuthedUser;
 import org.hyperdatalab.wbmodule.common.ApiException;
 import org.hyperdatalab.wbmodule.identity.AuditService;
+import org.hyperdatalab.wbmodule.identity.IdentityService;
 import org.hyperdatalab.wbmodule.store.FirestoreStore;
 import org.hyperdatalab.wbmodule.store.MembershipStore;
 import org.hyperdatalab.wbmodule.store.UserStore;
 import org.hyperdatalab.wbmodule.store.WorkspaceStore;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,18 +27,86 @@ public class WorkspaceService {
     private final MembershipStore memberships;
     private final UserStore users;
     private final AuditService audit;
+    private final IdentityService identity;
 
     public WorkspaceService(
             FirestoreStore firestore,
             WorkspaceStore workspaces,
             MembershipStore memberships,
             UserStore users,
-            AuditService audit) {
+            AuditService audit,
+            IdentityService identity) {
         this.firestore = firestore;
         this.workspaces = workspaces;
         this.memberships = memberships;
         this.users = users;
         this.audit = audit;
+        this.identity = identity;
+    }
+
+    /**
+     * Makes {@code email} a manager of the workspace, promoting a plain member to
+     * {@code workspace_manager} when needed.
+     *
+     * @return whether the global role was promoted
+     */
+    public boolean addManager(AuthedUser actor, String wid, String email) {
+        if (!identity.isOrgEmail(email))
+            throw ApiException.unprocessable("wrong_domain", "Only addresses of the org domain.");
+        if (users.find(email).isEmpty()) identity.refreshFromDirectory(email);
+        return firestore.transaction(
+                tx -> {
+                    UserStore.User user = users.find(tx, email).orElse(null);
+                    if (user != null && user.disabled())
+                        throw ApiException.conflict("inactive_user", email + " is disabled.");
+                    boolean promoted =
+                            user == null || user.role() == null || "member".equals(user.role());
+                    WorkspaceStore.Workspace workspace =
+                            workspaces
+                                    .find(tx, wid)
+                                    .orElseThrow(
+                                            () -> ApiException.notFound("Workspace not found."));
+                    MembershipStore.Membership old =
+                            memberships.find(tx, wid + "_" + email).orElse(null);
+                    if (promoted) {
+                        users.promoteToWorkspaceManager(tx, email);
+                        audit.log(
+                                tx,
+                                actor.email(),
+                                "user.role",
+                                email,
+                                null,
+                                Map.of(
+                                        "from",
+                                        "member",
+                                        "to",
+                                        "workspace_manager",
+                                        "reason",
+                                        "assigned_manager"));
+                    }
+                    List<String> managers = new ArrayList<>(workspace.managerEmails());
+                    if (!managers.contains(email)) managers.add(email);
+                    workspaces.updateManagerEmails(tx, wid, managers);
+                    Long memberCount =
+                            old == null || !"approved".equals(old.status())
+                                    ? workspace.memberCount() + 1
+                                    : null;
+                    Long pendingCount =
+                            old != null && "pending".equals(old.status())
+                                    ? Math.max(0, workspace.pendingCount() - 1)
+                                    : null;
+                    if (memberCount != null || pendingCount != null)
+                        workspaces.updateCounts(tx, wid, memberCount, pendingCount);
+                    memberships.assignManager(tx, wid, email, actor.email(), Timestamp.now());
+                    audit.log(
+                            tx,
+                            actor.email(),
+                            "workspace.manager",
+                            email,
+                            wid,
+                            Map.of("promoted", promoted));
+                    return promoted;
+                });
     }
 
     public String create(

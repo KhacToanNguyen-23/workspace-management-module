@@ -2,6 +2,8 @@
 
 > Plan này viết để giao cho Codex làm. Đọc hết trước khi code. Làm theo thứ tự các phase, chạy test sau mỗi phase.
 
+> **Cập nhật:** các đường dẫn API trong plan này là bản đầu (`/api/w/...`, `/api/admin/...`). API hiện nằm dưới `/api/v1` với cây URL thống nhất; xem bảng đối chiếu trong [docs/INTEGRATION.md](../docs/INTEGRATION.md).
+
 ## 0. Mục tiêu
 
 Hệ thống chỉ còn **3 role toàn cục** (lưu ở field `role` của document `users/{email}` trong Firestore):

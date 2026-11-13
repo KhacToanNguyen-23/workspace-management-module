@@ -8,22 +8,24 @@ import {
 } from "@/components/ui/table";
 import type { AuditRow } from "../lib/types";
 import { EmptyRow, fmtShort, Loading } from "./ui";
+import { useTr } from "../../features/entry/i18n";
 
 export function AuditTable({ rows }: { rows: AuditRow[] | null }) {
+  const tr = useTr();
   if (!rows) return <Loading />;
   return (
     <Table>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
-          <TableHead className="w-40">Lúc</TableHead>
+          <TableHead className="w-40">{tr("Lúc")}</TableHead>
           <TableHead>Ai</TableHead>
-          <TableHead>Hành động</TableHead>
-          <TableHead>Đối tượng</TableHead>
-          <TableHead>Chi tiết</TableHead>
+          <TableHead>{tr("Hành động")}</TableHead>
+          <TableHead>{tr("Đối tượng")}</TableHead>
+          <TableHead>{tr("Chi tiết")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.length === 0 && <EmptyRow colSpan={5}>Chưa có nhật ký.</EmptyRow>}
+        {rows.length === 0 && <EmptyRow colSpan={5}>{tr("Chưa có nhật ký.")}</EmptyRow>}
         {rows.map((r, i) => (
           <TableRow key={r.id ?? `${r.at}-${i}`}>
             <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">

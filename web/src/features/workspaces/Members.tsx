@@ -37,21 +37,25 @@ import {
   type MemberRow,
   ROLE_LABEL,
 } from "../../shared/lib/types";
+import { useTr } from "../entry/i18n";
 
 export function MembersPage() {
+  const tr = useTr();
   const { info } = useWorkspace();
   const { me, reload: reloadMe } = useMe();
   const wid = info.workspace.id;
   const api = useApi();
   const act = useAction();
   const { ask, dialog } = useAsk();
-  const members = useQuery<MemberRow[]>(`/w/${wid}/members`);
-  const audit = useQuery<AuditRow[]>(`/w/${wid}/audit?limit=50`);
+  const members = useQuery<MemberRow[]>(`/workspaces/${wid}/members?limit=500`);
+  const audit = useQuery<AuditRow[]>(
+    `/audit-events?workspaceId=${wid}&limit=50`,
+  );
   const [email, setEmail] = useState("");
   if (!info.canManage)
     return (
       <PageBody>
-        <ErrorBox error="Bạn không có quyền quản lý workspace này." />
+        <ErrorBox error={tr("Bạn không có quyền quản lý workspace này.")} />
       </PageBody>
     );
   const refresh = () => {
@@ -61,29 +65,31 @@ export function MembersPage() {
   };
   const decide = (
     id: string,
-    what: "approve" | "reject" | "revoke",
+    status: "approved" | "rejected" | "revoked",
     body: object = {},
   ) =>
     void act
-      .run(() => api("POST", `/w/${wid}/members/${id}/${what}`, body))
+      .run(() =>
+        api("PATCH", `/workspaces/${wid}/members/${id}`, { status, ...body }),
+      )
       .then(refresh);
   const reject = async (m: MemberRow) => {
     const note = await ask({
-      title: `Từ chối ${m.email}?`,
-      noteLabel: "Lý do từ chối",
-      confirmLabel: "Từ chối",
+      title: tr("Từ chối {email}?", { email: m.email }),
+      noteLabel: tr("Lý do từ chối"),
+      confirmLabel: tr("Từ chối"),
       destructive: true,
     });
-    if (note !== null) decide(m.id, "reject", { note });
+    if (note !== null) decide(m.id, "rejected", { note });
   };
   const revoke = async (m: MemberRow) => {
     const ok = await ask({
-      title: `Thu hồi quyền của ${m.email}?`,
-      description: "Người này sẽ không còn truy cập workspace.",
-      confirmLabel: "Thu hồi",
+      title: tr("Thu hồi quyền của {email}?", { email: m.email }),
+      description: tr("Người này sẽ không còn truy cập workspace."),
+      confirmLabel: tr("Thu hồi"),
       destructive: true,
     });
-    if (ok !== null) decide(m.id, "revoke");
+    if (ok !== null) decide(m.id, "revoked");
   };
   const rows = members.data ?? [];
   const pending = rows.filter((m) => m.status === "pending"),
@@ -93,7 +99,7 @@ export function MembersPage() {
   return (
     <>
       <PageHeader
-        title="Quản lý workspace"
+        title={tr("Quản lý workspace")}
         sub={info.workspace.name}
         actions={
           <form
@@ -101,7 +107,7 @@ export function MembersPage() {
             onSubmit={(e) => {
               e.preventDefault();
               void act
-                .run(() => api("POST", `/w/${wid}/members`, { email }))
+                .run(() => api("POST", `/workspaces/${wid}/members`, { email }))
                 .then((r) => {
                   if (r !== undefined) setEmail("");
                   refresh();
@@ -110,39 +116,43 @@ export function MembersPage() {
           >
             <Input
               type="email"
-              aria-label="Email thành viên cần thêm"
+              aria-label={tr("Email thành viên cần thêm")}
               placeholder="ten@hyperdatalab.org"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-8 w-60 text-[13px]"
             />
-            <Button size="sm" disabled={act.busy || !email}>
+            <Button
+              size="sm"
+              disabled={act.busy || !email}
+              className="min-w-(--size-action-sm)"
+            >
               <UserPlus />
-              Thêm
+              {tr("Thêm")}
             </Button>
           </form>
         }
       />
       <PageBody>
         <ErrorBox error={act.error ?? members.error} />
-        <Section title="Chờ duyệt" count={members.data ? pending.length : undefined}>
+        <Section title={tr("Chờ duyệt")} count={members.data ? pending.length : undefined}>
           {!members.data ? (
             <Loading />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Người xin</TableHead>
-                  <TableHead>Lời nhắn</TableHead>
-                  <TableHead className="w-36">Gửi lúc</TableHead>
+                  <TableHead>{tr("Người xin")}</TableHead>
+                  <TableHead>{tr("Lời nhắn")}</TableHead>
+                  <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
                   <TableHead className="w-44">
-                    <span className="sr-only">Thao tác</span>
+                    <span className="sr-only">{tr("Thao tác")}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pending.length === 0 && (
-                  <EmptyRow colSpan={4}>Không có yêu cầu nào.</EmptyRow>
+                  <EmptyRow colSpan={4}>{tr("Không có yêu cầu nào.")}</EmptyRow>
                 )}
                 {pending.map((m) => (
                   <TableRow key={m.id}>
@@ -161,19 +171,21 @@ export function MembersPage() {
                     <TableCell>
                       <div className="flex justify-end gap-1.5">
                         <Button
+                          className="min-w-(--size-action-sm)"
                           size="sm"
                           disabled={act.busy}
-                          onClick={() => decide(m.id, "approve")}
+                          onClick={() => decide(m.id, "approved")}
                         >
-                          Duyệt
+                          {tr("Duyệt")}
                         </Button>
                         <Button
+                          className="min-w-(--size-action-sm)"
                           size="sm"
                           variant="outline"
                           disabled={act.busy}
                           onClick={() => void reject(m)}
                         >
-                          Từ chối
+                          {tr("Từ chối")}
                         </Button>
                       </div>
                     </TableCell>
@@ -184,14 +196,14 @@ export function MembersPage() {
           )}
         </Section>
 
-        <Section title="Thành viên" count={members.data ? approved.length : undefined}>
+        <Section title={tr("Thành viên")} count={members.data ? approved.length : undefined}>
           {/* The add form lives in the toolbar on wider screens. */}
           <form
             className="flex gap-2 py-3 sm:hidden"
             onSubmit={(e) => {
               e.preventDefault();
               void act
-                .run(() => api("POST", `/w/${wid}/members`, { email }))
+                .run(() => api("POST", `/workspaces/${wid}/members`, { email }))
                 .then((r) => {
                   if (r !== undefined) setEmail("");
                   refresh();
@@ -200,29 +212,29 @@ export function MembersPage() {
           >
             <Input
               type="email"
-              aria-label="Email thành viên cần thêm"
+              aria-label={tr("Email thành viên cần thêm")}
               placeholder="ten@hyperdatalab.org"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-9 flex-1"
             />
-            <Button disabled={act.busy || !email}>Thêm</Button>
+            <Button className="min-w-(--size-action-sm)" disabled={act.busy || !email}>{tr("Thêm")}</Button>
           </form>
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Thành viên</TableHead>
-                <TableHead className="w-40">Danh bạ</TableHead>
-                <TableHead className="w-28">Vai trò</TableHead>
-                <TableHead>Duyệt bởi</TableHead>
+                <TableHead>{tr("Thành viên")}</TableHead>
+                <TableHead className="w-40">{tr("Danh bạ")}</TableHead>
+                <TableHead className="w-28">{tr("Vai trò")}</TableHead>
+                <TableHead>{tr("Duyệt bởi")}</TableHead>
                 <TableHead className="w-10">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{tr("Thao tác")}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {members.data && approved.length === 0 && (
-                <EmptyRow colSpan={5}>Chưa có thành viên.</EmptyRow>
+                <EmptyRow colSpan={5}>{tr("Chưa có thành viên.")}</EmptyRow>
               )}
               {approved.map((m) => {
                 const locked =
@@ -237,7 +249,7 @@ export function MembersPage() {
                       <Badge value={m.directoryStatus} />
                     </TableCell>
                     <TableCell className="text-[13px]">
-                      {ROLE_LABEL[m.role]}
+                      {tr(ROLE_LABEL[m.role])}
                     </TableCell>
                     <TableCell>
                       <Stacked
@@ -256,7 +268,7 @@ export function MembersPage() {
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={`Thao tác với ${m.email}`}
+                              aria-label={tr("Thao tác với {email}", { email: m.email })}
                             >
                               <MoreHorizontal />
                             </Button>
@@ -267,7 +279,7 @@ export function MembersPage() {
                               disabled={act.busy}
                               onSelect={() => void revoke(m)}
                             >
-                              Thu hồi quyền
+                              {tr("Thu hồi quyền")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -281,7 +293,7 @@ export function MembersPage() {
           {past.length > 0 && (
             <details className="group border-t py-2 text-[13px]">
               <summary className="cursor-pointer py-1 text-muted-foreground hover:text-foreground">
-                Đã từ chối / thu hồi ({past.length})
+                {tr("Đã từ chối / thu hồi ({count})", { count: past.length })}
               </summary>
               <ul className="divide-y">
                 {past.map((m) => (
@@ -301,7 +313,7 @@ export function MembersPage() {
           )}
         </Section>
 
-        <Section title="Nhật ký">
+        <Section title={tr("Nhật ký")}>
           <AuditTable rows={audit.data} />
         </Section>
       </PageBody>

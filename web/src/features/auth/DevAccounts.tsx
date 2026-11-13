@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ErrorBox, Tag, useAsk } from "../../shared/components/ui";
 import { GLOBAL_ROLE_LABEL, type GlobalRole } from "../../shared/lib/types";
 import { switchDevAccount } from "./auth";
+import { useTr } from "../entry/i18n";
 
 /**
  * Local development only (VITE_AUTH_MODE=dev): the demo accounts seeded by the backend, one per
@@ -28,6 +29,7 @@ interface DevAccount {
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 function useDevAccounts() {
+  const tr = useTr();
   const [accounts, setAccounts] = useState<DevAccount[] | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(() => {
@@ -42,7 +44,7 @@ function useDevAccounts() {
       })
       .catch(() =>
         setError(
-          "Không lấy được danh sách tài khoản mẫu. Backend đã chạy với AUTH_MODE=dev chưa?",
+          tr("Không lấy được danh sách tài khoản mẫu. Backend đã chạy với AUTH_MODE=dev chưa?"),
         ),
       );
   }, []);
@@ -55,11 +57,12 @@ async function resetDemoData() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
-const roleText = (a: DevAccount) =>
-  a.disabled ? "Đã disable" : GLOBAL_ROLE_LABEL[a.role];
+const roleText = (a: DevAccount, tr: (vi: string) => string) =>
+  a.disabled ? tr("Đã disable") : tr(GLOBAL_ROLE_LABEL[a.role]);
 
 /** Login screen: one row per demo account, plus a reset of the demo data. */
 export function DevAccountList() {
+  const tr = useTr();
   const { accounts, error, reload } = useDevAccounts();
   const [busy, setBusy] = useState(false);
   const [resetError, setResetError] = useState("");
@@ -69,7 +72,7 @@ export function DevAccountList() {
     <div className="grid gap-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">
-          Tài khoản mẫu (dev)
+          {tr("Tài khoản mẫu (dev)")}
         </p>
         <Button
           type="button"
@@ -78,9 +81,9 @@ export function DevAccountList() {
           disabled={busy}
           onClick={async () => {
             const ok = await ask({
-              title: "Reset dữ liệu mẫu?",
+              title: tr("Reset dữ liệu mẫu?"),
               description:
-                "Xoá toàn bộ dữ liệu trong emulator và tạo lại dữ liệu mẫu.",
+                tr("Xoá toàn bộ dữ liệu trong emulator và tạo lại dữ liệu mẫu."),
               confirmLabel: "Reset",
               destructive: true,
             });
@@ -89,12 +92,12 @@ export function DevAccountList() {
             setResetError("");
             resetDemoData()
               .then(reload)
-              .catch((e) => setResetError(`Reset thất bại: ${String(e)}`))
+              .catch((e) => setResetError(tr("Reset thất bại: {error}", { error: String(e) })))
               .finally(() => setBusy(false));
           }}
         >
           <RotateCcw />
-          {busy ? "Đang reset…" : "Reset"}
+          {busy ? tr("Đang reset…") : "Reset"}
         </Button>
       </div>
       <ErrorBox error={error || resetError} />
@@ -110,7 +113,7 @@ export function DevAccountList() {
                 <span className="truncate text-[13px] font-medium">
                   {a.name}
                 </span>
-                <Tag>{roleText(a)}</Tag>
+                <Tag>{roleText(a, tr)}</Tag>
               </span>
               <span className="truncate text-xs text-muted-foreground">
                 {a.email} · {a.note}
@@ -126,11 +129,12 @@ export function DevAccountList() {
 
 /** User menu submenu: switch to another demo account without the login screen. */
 export function DevAccountMenu({ current }: { current: string }) {
+  const tr = useTr();
   const { accounts } = useDevAccounts();
   if (!accounts) return null;
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger>Đổi tài khoản (dev)</DropdownMenuSubTrigger>
+      <DropdownMenuSubTrigger>{tr("Đổi tài khoản (dev)")}</DropdownMenuSubTrigger>
       <DropdownMenuSubContent className="w-64">
         {accounts.map((a) => (
           <DropdownMenuItem
@@ -142,7 +146,7 @@ export function DevAccountMenu({ current }: { current: string }) {
             )}
           >
             <span className="truncate">{a.name}</span>
-            <span className="text-xs text-muted-foreground">{roleText(a)}</span>
+            <span className="text-xs text-muted-foreground">{roleText(a, tr)}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuSubContent>
