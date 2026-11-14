@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronsUpDown,
   FileDown,
+  FolderKanban,
   Layers,
   LayoutList,
   LogOut,
@@ -57,6 +58,7 @@ import { isSsoReturn } from "../features/auth/sso";
 import { AUTH_MODE, useAuth } from "../features/auth/auth";
 import { DevAccountMenu } from "../features/auth/DevAccounts";
 import { EntryPage } from "../features/entry/EntryPage";
+import { ProjectDetailPage, ProjectsPage } from "../features/projects/Projects";
 import { DownloadsPage } from "../features/workspaces/Downloads";
 import { MembersPage } from "../features/workspaces/Members";
 import { OnboardingPage } from "../features/workspaces/Onboarding";
@@ -299,6 +301,7 @@ function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <NavItem to="/projects" icon={FolderKanban} label="Dự án" />
               <NavItem to="/onboarding" icon={UserPlus} label="Tất cả workspace" />
               {me.user.isAdmin && (
                 <NavItem to="/admin" icon={Shield} label="Quản trị" />
@@ -485,6 +488,8 @@ export function App() {
         <Route path="onboarding" element={<OnboardingPage />} />
         <Route path="create-workspace" element={<Navigate to="/onboarding" replace />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:pid" element={<ProjectDetailPage />} />
         <Route path="w/:wid" element={<WorkspaceRoute />}>
           <Route index element={<WorkspaceHomePage />} />
           <Route path="downloads" element={<DownloadsPage />} />

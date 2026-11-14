@@ -29,6 +29,12 @@ public class SessionStore {
 
     public record Issued(String token, Instant expiresAt) {}
 
+    /**
+     * The user's SSO access token kept with a session to read their projects: encrypted by the
+     * caller, with its own (shorter) expiry.
+     */
+    public record SsoGrant(String sealedToken, Instant expiresAt) {}
+
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final FirestoreStore firestore;
@@ -49,6 +55,10 @@ public class SessionStore {
     }
 
     public Issued create(Session session, Duration life) {
+        return create(session, life, null);
+    }
+
+    public Issued create(Session session, Duration life, SsoGrant grant) {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         String token = "wbs_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -60,6 +70,10 @@ public class SessionStore {
         fields.put("picture", session.picture());
         fields.put("createdAt", Timestamp.now());
         fields.put("expiresAt", Timestamp.of(Date.from(expiresAt)));
+        if (grant != null) {
+            fields.put("ssoToken", grant.sealedToken());
+            fields.put("ssoTokenExpiresAt", Timestamp.of(Date.from(grant.expiresAt())));
+        }
         FirestoreStore.await(doc(token).set(fields));
         return new Issued(token, expiresAt);
     }
@@ -80,6 +94,15 @@ public class SessionStore {
                         FirestoreStore.text(d, "email"),
                         FirestoreStore.text(d, "name"),
                         FirestoreStore.text(d, "picture")));
+    }
+
+    /** The SSO grant kept with this session (possibly expired), or empty when there is none. */
+    public Optional<SsoGrant> ssoGrant(String token) {
+        Map<String, Object> d = FirestoreStore.await(doc(token).get()).getData();
+        if (d == null
+                || !(d.get("ssoToken") instanceof String sealed)
+                || !(d.get("ssoTokenExpiresAt") instanceof Timestamp t)) return Optional.empty();
+        return Optional.of(new SsoGrant(sealed, t.toDate().toInstant()));
     }
 
     public void delete(String token) {

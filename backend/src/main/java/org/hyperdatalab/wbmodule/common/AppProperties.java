@@ -12,6 +12,7 @@ public record AppProperties(
         @DefaultValue("admin@hyperdatalab.org") String adminEmail,
         @DefaultValue Auth auth,
         @DefaultValue Directory directory,
+        @DefaultValue Projects projects,
         @DefaultValue("http://localhost:3000") List<String> corsOrigins) {
 
     /**
@@ -34,7 +35,16 @@ public record AppProperties(
             String baseUrl,
             String clientId,
             String clientSecret,
-            @DefaultValue("12") int sessionHours) {}
+            @DefaultValue("12") int sessionHours,
+            String tokenKey) {}
+
+    /**
+     * Research projects, owned by ResearchPulse. mode=http reads them from the ResearchPulse API
+     * with the signed-in user's own SSO token; mode=demo keeps sample projects in memory;
+     * mode=off hides them; mode=auto (default) is http with the SSO and demo otherwise. Empty
+     * baseUrl = the SSO base URL.
+     */
+    public record Projects(@DefaultValue("auto") String mode, String baseUrl) {}
 
     /**
      * Where user information for the org domain comes from. mode=http : an external REST API (GET

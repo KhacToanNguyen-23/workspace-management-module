@@ -109,6 +109,9 @@ web/src/
 | `SSO_CLIENT_ID` | rỗng | Client id của module, lấy ở ResearchPulse → Connected applications. Bắt buộc khi `AUTH_MODE=sso`. |
 | `SSO_CLIENT_SECRET` | rỗng | Secret của client loại Confidential; để trống nếu đăng ký loại Public. Chỉ đặt ở backend. |
 | `SSO_SESSION_HOURS` | `12` | Thời gian một lần đăng nhập có hiệu lực trước khi phải qua SSO lại. |
+| `PROJECTS_MODE` | `auto` | Nguồn dự án: `auto` (ResearchPulse khi dùng SSO, dữ liệu mẫu khi dev), `http`, `demo` hoặc `off`. |
+| `PROJECTS_BASE_URL` | rỗng | Địa chỉ API dự án; rỗng thì dùng `SSO_BASE_URL`. |
+| `SSO_TOKEN_KEY` | rỗng | Khoá mã hoá token SSO lưu ở backend (base64 của 32 byte). Production nên đặt, mọi instance dùng chung. |
 | `FIREBASE_PROJECT_ID` | `hyperdatalab-writing-bank` | Firebase project dùng để kiểm tra ID token. |
 | `ADMIN_EMAIL` | `admin@hyperdatalab.org` | Admin đầu tiên, luôn là `admin` và không sửa được trên giao diện. Phải là tài khoản có thật trong user directory. |
 | `DIRECTORY_MODE` | `mock` | Nguồn user directory: `http`, `google`, `mock` hoặc `off`. Bị bỏ qua (luôn là `off`) khi `AUTH_MODE=sso`. |
@@ -142,6 +145,28 @@ Giới hạn cần biết:
 
 - SSO không có API tra cứu user theo email. Manager thêm được mọi địa chỉ `@hyperdatalab.org`; hồ sơ (tên, ngành) chỉ có sau lần đăng nhập đầu của người đó.
 - Hồ sơ bị khoá ở ResearchPulse sẽ không đăng nhập mới được, nhưng session đang mở còn hiệu lực tới khi hết hạn. Muốn chặn ngay thì admin vô hiệu hoá user trong module.
+
+## Dự án nghiên cứu (ResearchPulse)
+
+Trang **Dự án** (`/projects`) đọc dự án từ ResearchPulse theo tài liệu `EXTERNAL_RESEARCH_PROJECTS_API_VI.md` của bên ResearchPulse. Module không lưu dự án.
+
+- Mỗi người thấy **các dự án mình đang tham gia** (`GET /api/v1/me/research-projects`) và chi tiết từng dự án kèm thành viên (tên, vai trò). API của ResearchPulse chưa có danh sách toàn lab và chưa cho đọc email thành viên.
+- Backend gọi ResearchPulse bằng **access token SSO của chính người dùng**, nhận lúc đăng nhập, lưu mã hoá (AES-GCM, khoá `SSO_TOKEN_KEY`) cùng session và không gửi xuống trình duyệt. Token sống 1 giờ, không gia hạn được: sau đó trang có nút **Đăng nhập lại**.
+- Scope `research_projects:read` **tự bật**: trước mỗi lần đăng nhập, web hỏi backend (`GET /api/v1/sessions/options`), backend thử `/oauth/authorize` với scope đó. ResearchPulse đã cấp thì xin luôn, chưa cấp thì đăng nhập như thường (xin scope chưa được cấp sẽ làm SSO từ chối cả lần đăng nhập). Kết quả được nhớ 5 phút nếu chưa cấp, 6 giờ nếu đã cấp.
+- **Admin thêm/xoá thành viên dự án**: giao diện và API đã có nhưng chỉ hoạt động với dữ liệu mẫu, vì API của ResearchPulse chỉ cho đọc. Với dữ liệu thật, phần này tự ẩn (`canManageMembers: false`) và các API ghi trả `501 not_supported`.
+- `PROJECTS_MODE=auto` (mặc định): đăng nhập SSO thì đọc ResearchPulse, chế độ `dev` thì dùng 3 dự án mẫu trong bộ nhớ.
+
+API của module:
+
+| Method | Path | Ai | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/projects` | Mọi người | `{mode, listsAll, canManageMembers, items}`. |
+| GET | `/api/v1/projects/{id}` | Mọi người | Chi tiết kèm `members`; admin thấy `email` khi nguồn có. |
+| POST | `/api/v1/projects/{id}/members` | Admin | `{email, role}`; `501` khi ResearchPulse chưa hỗ trợ. |
+| PATCH | `/api/v1/projects/{id}/members/{uid}` | Admin | `{role}`. |
+| DELETE | `/api/v1/projects/{id}/members/{uid}` | Admin | Xoá thành viên. |
+
+Lỗi thường gặp: `409 sso_token_expired` (quá 1 giờ sau đăng nhập), `409 scope_not_granted` (ResearchPulse chưa cấp quyền đọc dự án), `429 rate_limited`, `502 projects_unavailable`.
 
 ## User directory
 

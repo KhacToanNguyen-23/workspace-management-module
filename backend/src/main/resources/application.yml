@@ -30,6 +30,14 @@ app:
       # Empty for a Public client; set it for a Confidential one.
       client-secret: ${SSO_CLIENT_SECRET:}
       session-hours: ${SSO_SESSION_HOURS:12}
+      # Base64 of 32 random bytes: encrypts the SSO tokens kept to read projects. Every backend
+      # instance needs the same one. Empty = a random key per start (fine locally).
+      token-key: ${SSO_TOKEN_KEY:}
+  projects:
+    # auto (http with the SSO, demo otherwise) | http | demo | off
+    mode: ${PROJECTS_MODE:auto}
+    # Empty = the SSO base URL.
+    base-url: ${PROJECTS_BASE_URL:}
     firebase-project-id: ${FIREBASE_PROJECT_ID:hyperdatalab-writing-bank}
   directory:
     # http (external user API) | google (Admin SDK) | mock | off

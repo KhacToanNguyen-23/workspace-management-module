@@ -15,7 +15,23 @@ const SSO_BASE = String(import.meta.env.VITE_SSO_BASE_URL ?? "").replace(
   "",
 );
 const CLIENT_ID = String(import.meta.env.VITE_SSO_CLIENT_ID ?? "");
-const SCOPE = "email profile hyperdatalab_profile";
+const BASE_SCOPE = "email profile hyperdatalab_profile";
+
+/**
+ * The scopes to ask for. The backend checks whether ResearchPulse lets this client read projects
+ * (research_projects:read): asking for a scope it lacks would make the SSO refuse the sign-in.
+ */
+async function scopeFor(redirectUri: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/sessions/options?redirectUri=${encodeURIComponent(redirectUri)}`,
+    );
+    const data = await res.json();
+    return res.ok && typeof data?.scope === "string" ? data.scope : BASE_SCOPE;
+  } catch {
+    return BASE_SCOPE;
+  }
+}
 
 const ATTEMPT_KEY = "wb-module-sso-attempt";
 const SESSION_KEY = "wb-module-sso-session";
@@ -88,7 +104,7 @@ export async function startSsoSignIn(returnTo: string): Promise<void> {
     response_type: "code",
     client_id: CLIENT_ID,
     redirect_uri: callbackUrl(),
-    scope: SCOPE,
+    scope: await scopeFor(callbackUrl()),
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",

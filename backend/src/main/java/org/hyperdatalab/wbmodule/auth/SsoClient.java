@@ -47,6 +47,10 @@ public class SsoClient {
             String studentId,
             String major) {}
 
+    /** A sign-in: the profile, and the SSO access token with its expiry and granted scopes. */
+    public record SignedIn(
+            Profile profile, String accessToken, java.time.Instant expiresAt, String scope) {}
+
     private final HttpClient http =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final ObjectMapper json;
@@ -96,7 +100,7 @@ public class SsoClient {
     }
 
     /** Exchanges a one-time authorization code and returns the profile of who signed in. */
-    public Profile signIn(String code, String codeVerifier, String redirectUri) {
+    public SignedIn signIn(String code, String codeVerifier, String redirectUri) {
         Map<String, String> form = new LinkedHashMap<>();
         form.put("grant_type", "authorization_code");
         form.put("client_id", clientId);
@@ -135,7 +139,9 @@ public class SsoClient {
                                 .GET()
                                 .build(),
                         "The sign-in service did not release your profile; sign in again.");
-        return new Profile(
+        long life = Math.min(Math.max(token.path("expires_in").asLong(3600), 0), 86_400);
+        Profile profile =
+                new Profile(
                 text(info, "sub"),
                 text(info, "email"),
                 info.path("email_verified").asBoolean(false),
@@ -144,5 +150,10 @@ public class SsoClient {
                 text(info, "role"),
                 text(info, "student_id"),
                 text(info, "major"));
+        return new SignedIn(
+                profile,
+                accessToken,
+                java.time.Instant.now().plusSeconds(life),
+                token.path("scope").asText(""));
     }
 }

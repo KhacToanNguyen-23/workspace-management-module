@@ -28,6 +28,17 @@ Base path: `/api/v1`. Mọi route (trừ `GET /api/health` và `/api/dev/*` ở 
 | POST | `/api/v1/sessions` | Không cần token. Body `{code, codeVerifier, redirectUri}` lấy từ callback của HyperDataLab SSO. Trả `201 {token, expiresAt, user: {email, name}}`. Lỗi: `401 sso_rejected` (code sai hoặc hết hạn), `403 wrong_domain` / `unverified` / `disabled`, `422 invalid_redirect`, `502 sso_unavailable`. |
 | DELETE | `/api/v1/sessions/current` | Đăng xuất: session token hết hiệu lực ngay. Trả `204`. |
 
+### Dự án nghiên cứu (ResearchPulse)
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/v1/sessions/options?redirectUri=` | Không cần token: scope web nên xin khi đăng nhập SSO. |
+| GET | `/api/v1/projects` | Dự án của người đăng nhập (`listsAll: false`) hoặc dự án mẫu. |
+| GET | `/api/v1/projects/{id}` | Chi tiết kèm `members`. |
+| POST / PATCH / DELETE | `/api/v1/projects/{id}/members[/{uid}]` | Admin; `501 not_supported` khi ResearchPulse chưa cho ghi. |
+
+Xem README, mục "Dự án nghiên cứu".
+
 ### Hồ sơ và catalogue
 
 | Method | Path | Mô tả |

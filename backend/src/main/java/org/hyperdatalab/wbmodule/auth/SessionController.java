@@ -19,6 +19,8 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,17 +46,32 @@ public class SessionController {
     private final SessionStore sessions;
     private final IdentityService identity;
     private final AppProperties props;
+    private final TokenCipher cipher;
+    private final SsoScopes scopes;
 
     public SessionController(
             ObjectMapper json,
             SessionStore sessions,
             IdentityService identity,
-            AppProperties props) {
+            AppProperties props,
+            TokenCipher cipher) {
         AppProperties.Sso config = props.auth().sso();
         this.sso = new SsoClient(json, config.baseUrl(), config.clientId(), config.clientSecret());
         this.sessions = sessions;
         this.identity = identity;
         this.props = props;
+        this.cipher = cipher;
+        this.scopes = new SsoScopes(config.baseUrl(), config.clientId());
+    }
+
+    /**
+     * What the web app needs before sending the user to the SSO: the scopes to ask for (the
+     * project scope only once ResearchPulse grants it to this client).
+     */
+    @GetMapping("/options")
+    Map<String, Object> options(@RequestParam String redirectUri) {
+        requireOwnCallback(redirectUri);
+        return Map.of("scope", scopes.forCallback(redirectUri));
     }
 
     record SignIn(
@@ -81,7 +98,8 @@ public class SessionController {
     @PostMapping
     ResponseEntity<Map<String, Object>> signIn(@Valid @RequestBody SignIn b) {
         requireOwnCallback(b.redirectUri());
-        SsoClient.Profile p = sso.signIn(b.code(), b.codeVerifier(), b.redirectUri());
+        SsoClient.SignedIn signedIn = sso.signIn(b.code(), b.codeVerifier(), b.redirectUri());
+        SsoClient.Profile p = signedIn.profile();
         if (p.sub() == null || p.sub().isBlank() || p.email() == null || p.email().isBlank())
             throw new ApiException(
                     HttpStatus.BAD_GATEWAY,
@@ -94,10 +112,19 @@ public class SessionController {
         AuthedUser user = identity.resolve(new TokenIdentity(p.sub(), email, p.name(), p.picture()));
         identity.applySsoProfile(email, p.name(), p.picture(), p.major(), p.role(), p.studentId());
         String name = p.name() == null || p.name().isBlank() ? user.name() : p.name();
+        // The SSO token is kept (encrypted) only when it may read the user's projects.
+        boolean readsProjects =
+                java.util.Arrays.asList(signedIn.scope().trim().split("\\s+"))
+                        .contains(SsoScopes.PROJECTS);
         SessionStore.Issued issued =
                 sessions.create(
                         new SessionStore.Session(p.sub(), email, name, p.picture()),
-                        Duration.ofHours(props.auth().sso().sessionHours()));
+                        Duration.ofHours(props.auth().sso().sessionHours()),
+                        readsProjects
+                                ? new SessionStore.SsoGrant(
+                                        cipher.encrypt(signedIn.accessToken()),
+                                        signedIn.expiresAt())
+                                : null);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .cacheControl(CacheControl.noStore())
                 .body(

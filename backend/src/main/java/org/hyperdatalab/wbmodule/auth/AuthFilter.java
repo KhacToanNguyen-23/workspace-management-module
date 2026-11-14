@@ -43,6 +43,8 @@ public class AuthFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/dev/")
                 // Signing in: exchanges an SSO authorization code for a session.
                 || (path.equals(Locations.API + "/sessions") && "POST".equals(req.getMethod()))
+                // Which scopes to ask the SSO for, before anyone is signed in.
+                || path.equals(Locations.API + "/sessions/options")
                 || "OPTIONS".equals(req.getMethod());
     }
 
