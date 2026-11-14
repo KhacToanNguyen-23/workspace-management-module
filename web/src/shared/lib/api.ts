@@ -3,6 +3,9 @@ import { useAuth } from "../../features/auth/auth";
 
 const BASE = import.meta.env.VITE_API_BASE ?? "";
 
+/** Window event fired after every successful write, so counters elsewhere can refresh. */
+export const DATA_CHANGED = "wb:data-changed";
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -57,7 +60,10 @@ export function useApi(): Api {
         res = await send(true);
         if (res.status === 401) await signOut();
       }
-      if (res.status === 204) return { data: undefined as T, total: null };
+      if (res.status === 204) {
+        if (method !== "GET") window.dispatchEvent(new Event(DATA_CHANGED));
+        return { data: undefined as T, total: null };
+      }
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new ApiError(
@@ -66,6 +72,7 @@ export function useApi(): Api {
           data?.error?.code ?? "error",
         );
       }
+      if (method !== "GET") window.dispatchEvent(new Event(DATA_CHANGED));
       const total = res.headers.get("X-Total-Count");
       return { data: data as T, total: total === null ? null : Number(total) };
     },

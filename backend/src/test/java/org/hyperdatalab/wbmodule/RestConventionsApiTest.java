@@ -316,6 +316,26 @@ class RestConventionsApiTest extends IntegrationTest {
         assertThat(get(V1 + "/audit-events?workspaceId=" + wid, ALICE).status()).isEqualTo(403);
     }
 
+    @Test
+    void auditEventsCarryDisplayNames() throws Exception {
+        String wid = seedWorkspace("research");
+        joinAndApprove(wid, ALICE, "member");
+
+        JsonNode rows = get(V1 + "/audit-events?workspaceId=" + wid, MANAGER).body();
+        JsonNode created = null, approved = null;
+        for (JsonNode r : rows) {
+            assertThat(r.path("actorName").asText()).isNotBlank();
+            if (r.path("action").asText().equals("workspace.create")) created = r;
+            if (r.path("action").asText().equals("membership.approve")) approved = r;
+        }
+        // The stored target is a document id or an email; the name stands in for it.
+        assertThat(created).isNotNull();
+        assertThat(created.path("targetName").asText()).isEqualTo("Writing Lab research");
+        assertThat(approved).isNotNull();
+        assertThat(approved.path("target").asText()).isEqualTo(ALICE);
+        assertThat(approved.path("targetName").asText()).isNotBlank().isNotEqualTo(ALICE);
+    }
+
     // ---- read-only requests stay read-only ---------------------------------------------------
 
     @Test

@@ -35,8 +35,10 @@ import {
   fmtShort,
   useAction,
   useAsk,
+  ScrollList,
 } from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
+import { useCount } from "../../shared/lib/pending";
 import {
   GLOBAL_ROLE_LABEL,
   type AdminUser,
@@ -44,6 +46,7 @@ import {
   type GlobalRole,
   type WorkspaceRequest,
 } from "../../shared/lib/types";
+import { useTr } from "../entry/i18n";
 
 const TABS = [
   { value: "users", label: "Người dùng" },
@@ -53,17 +56,21 @@ const TABS = [
 ] as const;
 
 export function AdminPage() {
+  const tr = useTr();
   const { me } = useMe();
   const [tab, setTab] = useState<string>("users");
+  const pendingRequests = useCount(
+    me.user.isAdmin ? "/workspace-requests?status=pending" : null,
+  );
   if (!me.user.isAdmin)
     return (
       <PageBody>
-        <ErrorBox error="Chỉ admin mới vào được trang này." />
+        <ErrorBox error={tr("Chỉ admin mới vào được trang này.")} />
       </PageBody>
     );
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-0">
-      <PageHeader title="Quản trị" />
+      <PageHeader title={tr("Quản trị")} />
       <div className="overflow-x-auto border-b px-4 md:px-8">
         <TabsList variant="line" className="h-10 gap-4 p-0">
           {TABS.map((t) => (
@@ -72,7 +79,15 @@ export function AdminPage() {
               value={t.value}
               className="flex-none px-0 text-[13px] after:bg-primary group-data-[orientation=horizontal]/tabs:after:bottom-0"
             >
-              {t.label}
+              {tr(t.label)}
+              {t.value === "requests" && pendingRequests > 0 && (
+                <span
+                  aria-label={tr("{count} chờ duyệt", { count: pendingRequests })}
+                  className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-xs font-semibold text-[#0f2339] tabular-nums"
+                >
+                  {pendingRequests > 99 ? "99+" : pendingRequests}
+                </span>
+              )}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -100,6 +115,8 @@ const ROLE_OPTIONS = (["member", "workspace_manager", "admin"] as GlobalRole[]).
 );
 
 function UsersTab() {
+  const tr = useTr();
+  const roleOptions = ROLE_OPTIONS.map((o) => ({ ...o, label: tr(o.label) }));
   const api = useApi(),
     act = useAction(),
     { ask, dialog } = useAsk(),
@@ -129,27 +146,27 @@ function UsersTab() {
           />
           <Input
             type="search"
-            aria-label="Tìm người dùng"
-            placeholder="Tìm email / tên"
+            aria-label={tr("Tìm người dùng")}
+            placeholder={tr("Tìm email / tên")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="h-8 w-64 pl-8 text-[13px]"
           />
         </div>
         <SelectField
-          aria-label="Lọc theo role"
+          aria-label={tr("Lọc theo role")}
           value={role}
           onChange={setRole}
-          options={[{ value: "", label: "Mọi role" }, ...ROLE_OPTIONS]}
+          options={[{ value: "", label: tr("Mọi role") }, ...roleOptions]}
         />
         <SelectField
-          aria-label="Lọc theo trạng thái"
+          aria-label={tr("Lọc theo trạng thái")}
           value={disabled}
           onChange={setDisabled}
           options={[
-            { value: "", label: "Mọi trạng thái" },
-            { value: "false", label: "Đang hoạt động" },
-            { value: "true", label: "Đã vô hiệu hoá" },
+            { value: "", label: tr("Mọi trạng thái") },
+            { value: "false", label: tr("Đang hoạt động") },
+            { value: "true", label: tr("Đã vô hiệu hoá") },
           ]}
         />
       </div>
@@ -158,94 +175,96 @@ function UsersTab() {
         {!users.data ? (
           <Loading />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Người dùng</TableHead>
-                <TableHead className="w-40">Danh bạ</TableHead>
-                <TableHead>Workspace</TableHead>
-                <TableHead className="w-48">Role</TableHead>
-                <TableHead className="w-32">Trạng thái</TableHead>
-                <TableHead className="w-10">
-                  <span className="sr-only">Thao tác</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.data.length === 0 && (
-                <EmptyRow colSpan={6}>Không có người dùng khớp bộ lọc.</EmptyRow>
-              )}
-              {users.data.map((u) => {
-                const locked =
-                  u.protected ||
-                  u.email === me.user.email;
-                return (
-                  <TableRow key={u.email}>
-                    <TableCell>
-                      <Stacked primary={u.name || "—"} secondary={u.email} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge value={u.directoryStatus} />
-                    </TableCell>
-                    <TableCell className="max-w-64 truncate text-[13px] text-muted-foreground">
-                      {u.workspaces
-                        ?.map((w) => `${w.name} (${w.role})`)
-                        .join(", ") || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <SelectField
-                        aria-label={`Role của ${u.email}`}
-                        value={u.role}
-                        disabled={locked}
-                        className="w-44"
-                        onChange={(value) => patch(u.email, { role: value })}
-                        options={ROLE_OPTIONS}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        value={u.disabled ? "disabled" : "active"}
-                        label={u.disabled ? "Đã vô hiệu hoá" : "Hoạt động"}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {!locked && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Thao tác với ${u.email}`}
-                            >
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              variant={u.disabled ? "default" : "destructive"}
-                              onSelect={async () => {
-                                const ok = await ask({
-                                  title: `${u.disabled ? "Mở khoá" : "Vô hiệu hoá"} ${u.email}?`,
-                                  confirmLabel: u.disabled
-                                    ? "Mở khoá"
-                                    : "Vô hiệu hoá",
-                                  destructive: !u.disabled,
-                                });
-                                if (ok !== null)
-                                  patch(u.email, { disabled: !u.disabled });
-                              }}
-                            >
-                              {u.disabled ? "Enable" : "Disable"}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <ScrollList>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{tr("Người dùng")}</TableHead>
+                  <TableHead className="w-40">{tr("Danh bạ")}</TableHead>
+                  <TableHead>Workspace</TableHead>
+                  <TableHead className="w-48">Role</TableHead>
+                  <TableHead className="w-32">{tr("Trạng thái")}</TableHead>
+                  <TableHead className="w-10">
+                    <span className="sr-only">{tr("Thao tác")}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.data.length === 0 && (
+                  <EmptyRow colSpan={6}>{tr("Không có người dùng khớp bộ lọc.")}</EmptyRow>
+                )}
+                {users.data.map((u) => {
+                  const locked =
+                    u.protected ||
+                    u.email === me.user.email;
+                  return (
+                    <TableRow key={u.email}>
+                      <TableCell>
+                        <Stacked primary={u.name || "—"} secondary={u.email} />
+                      </TableCell>
+                      <TableCell>
+                        <Badge value={u.directoryStatus} />
+                      </TableCell>
+                      <TableCell className="max-w-64 truncate text-[13px] text-muted-foreground">
+                        {u.workspaces
+                          ?.map((w) => `${w.name} (${w.role})`)
+                          .join(", ") || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <SelectField
+                          aria-label={tr("Role của {email}", { email: u.email })}
+                          value={u.role}
+                          disabled={locked}
+                          className="w-44"
+                          onChange={(value) => patch(u.email, { role: value })}
+                          options={roleOptions}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          value={u.disabled ? "disabled" : "active"}
+                          label={u.disabled ? tr("Đã vô hiệu hoá") : tr("Hoạt động")}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {!locked && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={tr("Thao tác với {email}", { email: u.email })}
+                              >
+                                <MoreHorizontal />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                variant={u.disabled ? "default" : "destructive"}
+                                onSelect={async () => {
+                                  const ok = await ask({
+                                    title: tr(u.disabled ? "Mở khoá {email}?" : "Vô hiệu hoá {email}?", { email: u.email }),
+                                    confirmLabel: u.disabled
+                                      ? tr("Mở khoá")
+                                      : tr("Vô hiệu hoá"),
+                                    destructive: !u.disabled,
+                                  });
+                                  if (ok !== null)
+                                    patch(u.email, { disabled: !u.disabled });
+                                }}
+                              >
+                                {u.disabled ? "Enable" : "Disable"}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollList>
         )}
       </div>
       <TruncationNote shown={users.data?.length} total={users.total} />
@@ -255,6 +274,7 @@ function UsersTab() {
 }
 
 function RequestsTab() {
+  const tr = useTr();
   const api = useApi(),
     act = useAction(),
     { ask, dialog } = useAsk();
@@ -265,10 +285,10 @@ function RequestsTab() {
   const refresh = () => q.reload();
   const approve = async (r: WorkspaceRequest, e: { name: string }) => {
     const note = await ask({
-      title: `Duyệt workspace "${e.name}"?`,
-      description: "Người yêu cầu sẽ thành quản lý của workspace mới.",
-      noteLabel: "Ghi chú",
-      confirmLabel: "Duyệt",
+      title: tr("Duyệt workspace \"{name}\"?", { name: e.name }),
+      description: tr("Người yêu cầu sẽ thành quản lý của workspace mới."),
+      noteLabel: tr("Ghi chú"),
+      confirmLabel: tr("Duyệt"),
     });
     if (note === null) return;
     void act
@@ -283,9 +303,9 @@ function RequestsTab() {
   };
   const reject = async (r: WorkspaceRequest) => {
     const note = await ask({
-      title: `Từ chối yêu cầu "${r.name}"?`,
-      noteLabel: "Lý do từ chối",
-      confirmLabel: "Từ chối",
+      title: tr("Từ chối yêu cầu \"{name}\"?", { name: r.name }),
+      noteLabel: tr("Lý do từ chối"),
+      confirmLabel: tr("Từ chối"),
       destructive: true,
     });
     if (note === null) return;
@@ -298,88 +318,92 @@ function RequestsTab() {
   return (
     <>
       <ErrorBox error={act.error ?? q.error} />
-      <Section title="Đang chờ duyệt" count={q.data?.length}>
+      <Section title={tr("Đang chờ duyệt")} count={q.data?.length}>
         {!q.data ? (
           <Loading />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Người yêu cầu</TableHead>
-                <TableHead>Tên workspace</TableHead>
-                <TableHead>Chi tiết</TableHead>
-                <TableHead>Lý do</TableHead>
-                <TableHead className="w-36">Gửi lúc</TableHead>
-                <TableHead className="w-44">
-                  <span className="sr-only">Thao tác</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {q.data.length === 0 && (
-                <EmptyRow colSpan={6}>Không có yêu cầu đang chờ.</EmptyRow>
-              )}
-              {q.data.map((r) => {
-                const e = edits[r.id] ?? { name: r.name };
-                return (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      <Stacked
-                        primary={r.requesterName || r.requester}
-                        secondary={`${r.requester}${r.department ? ` · ${r.department}` : ""}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        aria-label="Tên workspace (admin có thể sửa trước khi duyệt)"
-                        value={e.name}
-                        onChange={(x) =>
-                          setEdits({
-                            ...edits,
-                            [r.id]: { ...e, name: x.target.value },
-                          })
-                        }
-                        className="h-8 min-w-40 text-[13px]"
-                      />
-                    </TableCell>
-                    <TableCell className="text-[13px]">
-                      <div className="flex items-center gap-2">
-                        <Tag>{r.type}</Tag>
-                        <span className="truncate text-muted-foreground">
-                          {r.description || "—"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-[13px] text-muted-foreground">
-                      {r.reason || "—"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
-                      {fmtShort(r.requestedAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1.5">
-                        <Button
-                          size="sm"
-                          disabled={act.busy}
-                          onClick={() => void approve(r, e)}
-                        >
-                          Duyệt
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={act.busy}
-                          onClick={() => void reject(r)}
-                        >
-                          Từ chối
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <ScrollList>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{tr("Người yêu cầu")}</TableHead>
+                  <TableHead>{tr("Tên workspace")}</TableHead>
+                  <TableHead>{tr("Chi tiết")}</TableHead>
+                  <TableHead>{tr("Lý do")}</TableHead>
+                  <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                  <TableHead className="w-44">
+                    <span className="sr-only">{tr("Thao tác")}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {q.data.length === 0 && (
+                  <EmptyRow colSpan={6}>{tr("Không có yêu cầu đang chờ.")}</EmptyRow>
+                )}
+                {q.data.map((r) => {
+                  const e = edits[r.id] ?? { name: r.name };
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        <Stacked
+                          primary={r.requesterName || r.requester}
+                          secondary={`${r.requester}${r.department ? ` · ${r.department}` : ""}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={tr("Tên workspace (admin có thể sửa trước khi duyệt)")}
+                          value={e.name}
+                          onChange={(x) =>
+                            setEdits({
+                              ...edits,
+                              [r.id]: { ...e, name: x.target.value },
+                            })
+                          }
+                          className="h-8 min-w-40 text-[13px]"
+                        />
+                      </TableCell>
+                      <TableCell className="text-[13px]">
+                        <div className="flex items-center gap-2">
+                          <Tag>{r.type}</Tag>
+                          <span className="truncate text-muted-foreground">
+                            {r.description || "—"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-[13px] text-muted-foreground">
+                        {r.reason || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                        {fmtShort(r.requestedAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            className="min-w-(--size-action-sm)"
+                            size="sm"
+                            disabled={act.busy}
+                            onClick={() => void approve(r, e)}
+                          >
+                            {tr("Duyệt")}
+                          </Button>
+                          <Button
+                            className="min-w-(--size-action-sm)"
+                            size="sm"
+                            variant="outline"
+                            disabled={act.busy}
+                            onClick={() => void reject(r)}
+                          >
+                            {tr("Từ chối")}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollList>
         )}
       </Section>
       {dialog}
@@ -398,6 +422,7 @@ interface AdminWorkspace {
 }
 
 function WorkspacesTab() {
+  const tr = useTr();
   const api = useApi(),
     act = useAction(),
     { ask, dialog } = useAsk();
@@ -422,9 +447,9 @@ function WorkspacesTab() {
     if (!email) return;
     if (selected?.role === "member") {
       const ok = await ask({
-        title: "Nâng quyền người dùng?",
-        description: "Người này sẽ được nâng lên Quản lý workspace",
-        confirmLabel: "Tiếp tục",
+        title: tr("Nâng quyền người dùng?"),
+        description: tr("Người này sẽ được nâng lên Quản lý workspace"),
+        confirmLabel: tr("Tiếp tục"),
       });
       if (ok === null) return;
     }
@@ -440,8 +465,8 @@ function WorkspacesTab() {
         if (result) {
           setPromotionMessage(
             result.promoted
-              ? `${email} đã được nâng lên Quản lý workspace.`
-              : `${email} đã được thêm làm manager.`,
+              ? tr("{email} đã được nâng lên Quản lý workspace.", { email })
+              : tr("{email} đã được thêm làm manager.", { email }),
           );
           setManagerSelections({ ...managerSelections, [w.id]: "" });
           refresh();
@@ -451,7 +476,7 @@ function WorkspacesTab() {
 
   return (
     <>
-      <Section title="Tạo workspace">
+      <Section title={tr("Tạo workspace")}>
         <form
           className="grid gap-3 pt-3 md:grid-cols-[1fr_10rem_1fr_1fr_auto] md:items-end"
           onSubmit={(e) => {
@@ -466,7 +491,7 @@ function WorkspacesTab() {
               .then(refresh);
           }}
         >
-          <Field label="Tên" htmlFor="aw-name">
+          <Field label={tr("Tên")} htmlFor="aw-name">
             <Input
               id="aw-name"
               required
@@ -475,7 +500,7 @@ function WorkspacesTab() {
               className="h-8 text-[13px]"
             />
           </Field>
-          <Field label="Loại" htmlFor="aw-type">
+          <Field label={tr("Loại")} htmlFor="aw-type">
             <SelectField
               id="aw-type"
               className="w-full"
@@ -487,7 +512,7 @@ function WorkspacesTab() {
               }))}
             />
           </Field>
-          <Field label="Mô tả" htmlFor="aw-desc">
+          <Field label={tr("Mô tả")} htmlFor="aw-desc">
             <Input
               id="aw-desc"
               value={form.description}
@@ -506,7 +531,7 @@ function WorkspacesTab() {
               className="h-8 text-[13px]"
             />
           </Field>
-          <Button size="sm">Tạo</Button>
+          <Button size="sm">{tr("Tạo")}</Button>
         </form>
       </Section>
 
@@ -521,94 +546,97 @@ function WorkspacesTab() {
         {!list.data ? (
           <Loading />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Tên</TableHead>
-                <TableHead>Managers</TableHead>
-                <TableHead className="w-80">Thêm manager</TableHead>
-                <TableHead className="w-32">Thành viên</TableHead>
-                <TableHead className="w-32">Trạng thái</TableHead>
-                <TableHead className="w-24">
-                  <span className="sr-only">Thao tác</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.data.length === 0 && (
-                <EmptyRow colSpan={6}>Chưa có workspace.</EmptyRow>
-              )}
-              {list.data.map((w) => (
-                <TableRow key={w.id}>
-                  <TableCell>
-                    <Stacked primary={w.name} secondary={w.type} />
-                  </TableCell>
-                  <TableCell className="max-w-56 truncate text-[13px] text-muted-foreground">
-                    {(w.managers ?? []).join(", ") || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <SelectField
-                        aria-label={`Chọn manager cho ${w.name}`}
-                        placeholder="Chọn người dùng"
-                        className="w-56"
-                        value={managerSelections[w.id] ?? ""}
-                        onChange={(value) =>
-                          setManagerSelections({
-                            ...managerSelections,
-                            [w.id]: value,
-                          })
-                        }
-                        options={(users.data ?? [])
-                          .filter((user) => !w.managers?.includes(user.email))
-                          .map((user) => ({
-                            value: user.email,
-                            label: `${user.name || user.email} (${user.role})`,
-                          }))}
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!managerSelections[w.id] || act.busy}
-                        onClick={() => void addManager(w)}
-                      >
-                        Thêm
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-[13px] tabular-nums">
-                    {w.memberCount}
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {w.pendingCount} chờ
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge value={w.status} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={act.busy}
-                      onClick={() =>
-                        void act
-                          .run(() =>
-                            api("PATCH", `/workspaces/${w.id}`, {
-                              status:
-                                w.status === "active" ? "archived" : "active",
-                            }),
-                          )
-                          .then(refresh)
-                      }
-                    >
-                      {w.status === "active" ? "Lưu trữ" : "Mở lại"}
-                    </Button>
-                  </TableCell>
+          <ScrollList>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{tr("Tên")}</TableHead>
+                  <TableHead>Managers</TableHead>
+                  <TableHead className="w-80">{tr("Thêm manager")}</TableHead>
+                  <TableHead className="w-32">{tr("Thành viên")}</TableHead>
+                  <TableHead className="w-32">{tr("Trạng thái")}</TableHead>
+                  <TableHead className="w-24">
+                    <span className="sr-only">{tr("Thao tác")}</span>
+                  </TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {list.data.length === 0 && (
+                  <EmptyRow colSpan={6}>{tr("Chưa có workspace.")}</EmptyRow>
+                )}
+                {list.data.map((w) => (
+                  <TableRow key={w.id}>
+                    <TableCell>
+                      <Stacked primary={w.name} secondary={w.type} />
+                    </TableCell>
+                    <TableCell className="max-w-56 truncate text-[13px] text-muted-foreground">
+                      {(w.managers ?? []).join(", ") || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <SelectField
+                          aria-label={tr("Chọn manager cho {name}", { name: w.name })}
+                          placeholder={tr("Chọn người dùng")}
+                          className="w-56"
+                          value={managerSelections[w.id] ?? ""}
+                          onChange={(value) =>
+                            setManagerSelections({
+                              ...managerSelections,
+                              [w.id]: value,
+                            })
+                          }
+                          options={(users.data ?? [])
+                            .filter((user) => !w.managers?.includes(user.email))
+                            .map((user) => ({
+                              value: user.email,
+                              label: `${user.name || user.email} (${user.role})`,
+                            }))}
+                        />
+                        <Button
+                          className="min-w-(--size-action-sm)"
+                          size="sm"
+                          variant="outline"
+                          disabled={!managerSelections[w.id] || act.busy}
+                          onClick={() => void addManager(w)}
+                        >
+                          {tr("Thêm")}
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[13px] tabular-nums">
+                      {w.memberCount}
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {tr("{count} chờ", { count: w.pendingCount })}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge value={w.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={act.busy}
+                        onClick={() =>
+                          void act
+                            .run(() =>
+                              api("PATCH", `/workspaces/${w.id}`, {
+                                status:
+                                  w.status === "active" ? "archived" : "active",
+                              }),
+                            )
+                            .then(refresh)
+                        }
+                      >
+                        {w.status === "active" ? tr("Lưu trữ") : tr("Mở lại")}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollList>
         )}
       </Section>
       {dialog}

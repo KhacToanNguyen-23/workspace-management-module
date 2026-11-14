@@ -23,10 +23,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { STATUS_LABEL } from "../lib/types";
+import { useTr } from "../../features/entry/i18n";
 
 export function Loading({ rows = 3 }: { rows?: number }) {
+  const tr = useTr();
   return (
-    <div className="space-y-2 py-3" aria-busy="true" aria-label="Đang tải">
+    <div className="space-y-2 py-3" aria-busy="true" aria-label={tr("Đang tải")}>
       {Array.from({ length: rows }, (_, i) => (
         <Skeleton key={i} className="h-8 w-full" />
       ))}
@@ -62,6 +64,7 @@ const STATUS_TONE: Record<string, string> = {
 
 /** Restrained status: a coloured dot and the Vietnamese label. */
 export function Badge({ value, label }: { value: string; label?: string }) {
+  const tr = useTr();
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-foreground">
       <span
@@ -71,7 +74,7 @@ export function Badge({ value, label }: { value: string; label?: string }) {
           STATUS_TONE[value] ?? "bg-muted-foreground/50",
         )}
       />
-      {label ?? STATUS_LABEL[value] ?? value}
+      {label ?? tr(STATUS_LABEL[value] ?? value)}
     </span>
   );
 }
@@ -131,6 +134,36 @@ export function PageBody({
 }
 
 /** A flat section: a compact heading row over its content, separated by whitespace, not cards. */
+/**
+ * A list or table that can grow without bound (members, audit, requests…). Past
+ * --size-list-max it scrolls inside itself instead of stretching the page, and a table's header
+ * row stays visible while scrolling. The box also takes over the table's horizontal scrolling,
+ * so sticky headers work on narrow screens too.
+ */
+export function ScrollList({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      data-slot="scroll-list"
+      className={cn(
+        "scrollbar-minimal max-h-(--size-list-max) overflow-auto overscroll-contain",
+        "[&_[data-slot=table-container]]:overflow-visible",
+        // z-1: above this box's own rows only, so it still slides under the page toolbar (z-10).
+        "[&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-1 [&_thead_th]:bg-background",
+        "[&_thead_th]:shadow-[inset_0_-1px_0_var(--border)]",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function Section({
   title,
   count,
@@ -198,10 +231,11 @@ export function TruncationNote({
   shown: number | undefined;
   total: number | null;
 }) {
+  const tr = useTr();
   if (shown === undefined || total === null || total <= shown) return null;
   return (
     <p className="py-2 text-xs text-muted-foreground">
-      Hiển thị {shown}/{total} dòng. Thu hẹp bộ lọc để xem phần còn lại.
+      {tr("Hiển thị {shown}/{total} dòng. Thu hẹp bộ lọc để xem phần còn lại.", { shown, total })}
     </p>
   );
 }
@@ -320,6 +354,7 @@ interface AskOptions {
  * (or "" when there is no note box) on confirm, and to null on cancel. Render `dialog` once.
  */
 export function useAsk() {
+  const tr = useTr();
   const [opts, setOpts] = useState<AskOptions | null>(null);
   const [note, setNote] = useState("");
   const resolver = useRef<((v: string | null) => void) | null>(null);
@@ -373,7 +408,7 @@ export function useAsk() {
               size="sm"
               onClick={() => close(null)}
             >
-              Huỷ
+              {tr("Huỷ")}
             </Button>
             <Button
               type="submit"
@@ -381,7 +416,7 @@ export function useAsk() {
               variant={opts?.destructive ? "destructive" : "default"}
               autoFocus={!opts?.noteLabel}
             >
-              {opts?.confirmLabel ?? "Xác nhận"}
+              {opts?.confirmLabel ?? tr("Xác nhận")}
             </Button>
           </DialogFooter>
         </form>

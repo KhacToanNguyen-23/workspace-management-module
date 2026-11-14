@@ -28,12 +28,12 @@ export function EntryPage() {
             className="flex items-center gap-2 text-foreground! no-underline!"
             aria-label="HyperSpace"
           >
-            <HyperSpaceMark />
-            <span className="text-[15px] font-semibold tracking-tight">
+            <HyperSpaceMark className="size-9" />
+            <span className="hidden text-lg font-semibold tracking-tight min-[430px]:inline">
               HyperSpace
             </span>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <LangToggle lang={lang} onChange={setLang} label={t.langLabel} />
             {!session && (
               <Button
@@ -71,7 +71,7 @@ export function EntryPage() {
               {t.description}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
+              <Button asChild size="lg" className="px-5">
                 <Link
                   to={enterTo}
                   className="text-primary-foreground! no-underline!"
@@ -79,7 +79,7 @@ export function EntryPage() {
                   {t.enter}
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
+              <Button asChild size="lg" variant="outline" className="px-5">
                 <a
                   href="#capabilities"
                   className="text-foreground! no-underline!"

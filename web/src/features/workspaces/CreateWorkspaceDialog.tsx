@@ -17,6 +17,7 @@ import {
   useAction,
 } from "../../shared/components/ui";
 import { useApi, useQuery } from "../../shared/lib/api";
+import { useTr } from "../entry/i18n";
 
 const EMPTY = {
   name: "",
@@ -48,6 +49,7 @@ export function CreateWorkspaceDialog({
   /** Called after success; `id` is the new workspace id in "create" mode. */
   onDone: (id?: string) => void;
 }) {
+  const tr = useTr();
   const api = useApi();
   const act = useAction();
   const types = useQuery<{ code: string; name: string }[]>(
@@ -96,17 +98,17 @@ export function CreateWorkspaceDialog({
         >
           <DialogHeader>
             <DialogTitle className="text-base">
-              {isCreate ? "Tạo workspace" : "Xin tạo workspace mới"}
+              {isCreate ? tr("Tạo workspace") : tr("Xin tạo workspace mới")}
             </DialogTitle>
             <DialogDescription>
               {isCreate
-                ? "Workspace sẽ được tạo ngay cùng quyền quản lý của bạn."
-                : "Admin duyệt xong, bạn sẽ trở thành quản lý của workspace đó."}
+                ? tr("Workspace sẽ được tạo ngay cùng quyền quản lý của bạn.")
+                : tr("Admin duyệt xong, bạn sẽ trở thành quản lý của workspace đó.")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
-            <Field label="Tên workspace" htmlFor="cw-name">
+            <Field label={tr("Tên workspace")} htmlFor="cw-name">
               <Input
                 id="cw-name"
                 required
@@ -115,7 +117,7 @@ export function CreateWorkspaceDialog({
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </Field>
-            <Field label="Loại" htmlFor="cw-type">
+            <Field label={tr("Loại")} htmlFor="cw-type">
               <SelectField
                 id="cw-type"
                 size="default"
@@ -129,7 +131,7 @@ export function CreateWorkspaceDialog({
               />
             </Field>
           </div>
-          <Field label="Mô tả" htmlFor="cw-desc" hint="Tuỳ chọn">
+          <Field label={tr("Mô tả")} htmlFor="cw-desc" hint={tr("Tuỳ chọn")}>
             <Textarea
               id="cw-desc"
               rows={2}
@@ -155,7 +157,7 @@ export function CreateWorkspaceDialog({
             </Field>
           )}
           {!isCreate && (
-            <Field label="Lý do xin tạo" htmlFor="cw-reason">
+            <Field label={tr("Lý do xin tạo")} htmlFor="cw-reason">
               <Textarea
                 id="cw-reason"
                 rows={2}
@@ -172,10 +174,10 @@ export function CreateWorkspaceDialog({
               size="sm"
               onClick={() => onOpenChange(false)}
             >
-              Huỷ
+              {tr("Huỷ")}
             </Button>
             <Button type="submit" size="sm" disabled={act.busy}>
-              {isCreate ? "Tạo workspace" : "Gửi admin duyệt"}
+              {isCreate ? tr("Tạo workspace") : tr("Gửi admin duyệt")}
             </Button>
           </DialogFooter>
         </form>

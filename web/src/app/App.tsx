@@ -45,6 +45,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -66,10 +67,12 @@ import { WorkspaceHomePage } from "../features/workspaces/WorkspaceHome";
 import { HyperSpaceMark } from "../shared/components/Brand";
 import { ErrorBox, Loading } from "../shared/components/ui";
 import { useQuery } from "../shared/lib/api";
+import { useCount } from "../shared/lib/pending";
 import type { Me, WorkspaceView } from "../shared/lib/types";
 import { toWorkspaceInfo } from "../shared/lib/types";
 import { GLOBAL_ROLE_LABEL } from "../shared/lib/types";
 import { MeContext, WorkspaceContext, useMe } from "./contexts";
+import { useTr } from "../features/entry/i18n";
 
 function FullPage({ children }: { children: ReactNode }) {
   return (
@@ -80,6 +83,7 @@ function FullPage({ children }: { children: ReactNode }) {
 }
 
 function RequireSession({ children }: { children: ReactNode }) {
+  const tr = useTr();
   const { session, ready, signOut } = useAuth();
   const location = useLocation();
   const q = useQuery<Me>(session ? "/me" : null);
@@ -102,10 +106,10 @@ function RequireSession({ children }: { children: ReactNode }) {
     return (
       <FullPage>
         <HyperSpaceMark className="mb-4 size-8" />
-        <h1 className="text-lg font-semibold">Không vào được</h1>
+        <h1 className="text-lg font-semibold">{tr("Không vào được")}</h1>
         <ErrorBox error={q.error} />
         <Button variant="outline" size="sm" onClick={() => void signOut()}>
-          Đăng xuất
+          {tr("Đăng xuất")}
         </Button>
       </FullPage>
     );
@@ -176,33 +180,60 @@ function NavItem({
   icon: Icon,
   label,
   end,
+  count = 0,
+  countLabel,
 }: {
   to: string;
   icon: LucideIcon;
   label: string;
   end?: boolean;
+  /** Items waiting for this user's decision; shown as a badge when above zero. */
+  count?: number;
+  /** Accessible wording for the count, e.g. "3 chờ duyệt". */
+  countLabel?: string;
 }) {
   const { pathname } = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const active = !!matchPath({ path: to, end: end ?? false }, pathname);
+  const shown = count > 99 ? "99+" : String(count);
+  const fullLabel = count > 0 && countLabel ? `${label} (${countLabel})` : label;
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
         asChild
         isActive={active}
-        tooltip={label}
-        className="data-[active=true]:bg-(--sidebar-active)"
+        tooltip={fullLabel}
+        className={cn(
+          "data-[active=true]:bg-(--sidebar-active)",
+          count > 0 && "pr-10",
+        )}
       >
         <NavLink
           to={to}
           end={end}
+          aria-label={fullLabel}
           onClick={() => isMobile && setOpenMobile(false)}
-          className="text-[13px] text-sidebar-foreground"
+          className="relative text-[13px] text-sidebar-foreground"
         >
           <Icon className="text-sidebar-foreground/60 [[data-active=true]_&]:text-sky-300" />
           <span>{label}</span>
+          {count > 0 && (
+            // Collapsed sidebar: the number badge is hidden, so mark the icon with a dot.
+            <span
+              aria-hidden
+              className="absolute top-1.5 left-5 hidden size-2 rounded-full bg-amber-400 ring-2 ring-sidebar group-data-[collapsible=icon]:block"
+            />
+          )}
         </NavLink>
       </SidebarMenuButton>
+      {count > 0 && (
+        <SidebarMenuBadge
+          aria-hidden
+          className="rounded-full bg-amber-400 font-semibold text-[#0f2339] peer-hover/menu-button:text-[#0f2339] peer-data-[active=true]/menu-button:text-[#0f2339]"
+        >
+          {shown}
+        </SidebarMenuBadge>
+      )}
     </SidebarMenuItem>
   );
 }
@@ -212,9 +243,10 @@ function NavItem({
  * in either width. Hidden on phones, where the sidebar is a drawer.
  */
 function SidebarEdgeToggle() {
+  const tr = useTr();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
-  const label = collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên";
+  const label = collapsed ? tr("Mở rộng thanh bên") : tr("Thu gọn thanh bên");
   return (
     <button
       type="button"
@@ -235,12 +267,25 @@ function SidebarEdgeToggle() {
 }
 
 function AppSidebar() {
+  const tr = useTr();
   const { me } = useMe();
   const { wid } = useParams();
   const canManageCurrent =
     !!wid &&
     (me.user.isAdmin ||
       !!me.memberships.find((m) => m.workspace.id === wid)?.canManage);
+  // Requests waiting for a decision by this user. A member's own pending requests are not counted:
+  // there is nothing for them to act on.
+  const joinRequests = useCount(
+    canManageCurrent ? `/workspaces/${wid}/members?status=pending` : null,
+  );
+  const downloadRequests = useCount(
+    canManageCurrent ? `/workspaces/${wid}/download-requests?status=pending` : null,
+  );
+  const workspaceRequests = useCount(
+    me.user.isAdmin ? "/workspace-requests?status=pending" : null,
+  );
+  const waiting = (n: number) => tr("{count} chờ duyệt", { count: n });
   return (
     <Sidebar
       collapsible="icon"
@@ -277,18 +322,22 @@ function AppSidebar() {
                   to={`/w/${wid}`}
                   end
                   icon={LayoutList}
-                  label="Tổng quan"
+                  label={tr("Tổng quan")}
                 />
                 <NavItem
                   to={`/w/${wid}/downloads`}
                   icon={FileDown}
-                  label="Yêu cầu download"
+                  label={tr("Yêu cầu download")}
+                  count={downloadRequests}
+                  countLabel={waiting(downloadRequests)}
                 />
                 {canManageCurrent && (
                   <NavItem
                     to={`/w/${wid}/members`}
                     icon={Users}
-                    label="Quản lý workspace"
+                    label={tr("Quản lý workspace")}
+                    count={joinRequests}
+                    countLabel={waiting(joinRequests)}
                   />
                 )}
               </SidebarMenu>
@@ -297,14 +346,20 @@ function AppSidebar() {
         )}
         <SidebarGroup className="py-1">
           <SidebarGroupLabel className="h-7 text-[11px] text-sidebar-foreground/50">
-            Chung
+            {tr("Chung")}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <NavItem to="/projects" icon={FolderKanban} label="Dự án" />
-              <NavItem to="/onboarding" icon={UserPlus} label="Tất cả workspace" />
+              <NavItem to="/projects" icon={FolderKanban} label={tr("Dự án")} />
+              <NavItem to="/onboarding" icon={UserPlus} label={tr("Tất cả workspace")} />
               {me.user.isAdmin && (
-                <NavItem to="/admin" icon={Shield} label="Quản trị" />
+                <NavItem
+                  to="/admin"
+                  icon={Shield}
+                  label={tr("Quản trị")}
+                  count={workspaceRequests}
+                  countLabel={waiting(workspaceRequests)}
+                />
               )}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -320,18 +375,19 @@ function AppSidebar() {
 }
 
 function WorkspaceSwitcher() {
+  const tr = useTr();
   const { me } = useMe();
   const { wid } = useParams();
   const navigate = useNavigate();
   const approved = me.memberships.filter((m) => m.status === "approved");
   const current = approved.find((m) => m.workspace.id === wid);
-  const name = current?.workspace.name ?? "Chọn workspace";
+  const name = current?.workspace.name ?? tr("Chọn workspace");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          aria-label={`Chọn workspace (đang chọn: ${name})`}
+          aria-label={tr("Chọn workspace (đang chọn: {name})", { name })}
           className="h-9 w-full justify-between border border-sidebar-border bg-sidebar-accent/50 px-2.5 font-normal text-sidebar-foreground hover:bg-sidebar-accent hover:text-white group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
         >
           <span className="min-w-0 truncate text-[13px] font-medium group-data-[collapsible=icon]:hidden">
@@ -355,10 +411,10 @@ function WorkspaceSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Workspace của tôi
+          {tr("Workspace của tôi")}
         </DropdownMenuLabel>
         {approved.length === 0 && (
-          <DropdownMenuItem disabled>Chưa có workspace</DropdownMenuItem>
+          <DropdownMenuItem disabled>{tr("Chưa có workspace")}</DropdownMenuItem>
         )}
         {approved.map((m) => (
           <DropdownMenuItem
@@ -390,6 +446,7 @@ function initials(name: string, email: string) {
 }
 
 function UserMenu() {
+  const tr = useTr();
   const { me } = useMe();
   const { signOut } = useAuth();
   const { user } = me;
@@ -412,7 +469,7 @@ function UserMenu() {
               {user.name || user.email}
             </span>
             <span className="truncate text-[11px] text-sidebar-foreground/60">
-              {GLOBAL_ROLE_LABEL[user.role]}
+              {tr(GLOBAL_ROLE_LABEL[user.role])}
             </span>
           </span>
           <ChevronsUpDown className="size-3.5 text-sidebar-foreground/60" />
@@ -436,7 +493,7 @@ function UserMenu() {
         )}
         <DropdownMenuItem onSelect={() => void signOut()}>
           <LogOut />
-          Đăng xuất
+          {tr("Đăng xuất")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
