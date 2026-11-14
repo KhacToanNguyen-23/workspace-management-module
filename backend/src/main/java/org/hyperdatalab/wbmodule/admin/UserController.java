@@ -82,6 +82,9 @@ public class UserController {
                                 s -> {
                                     Map<String, Object> x = FirestoreStore.data(s);
                                     x.put("email", s.getId());
+                                    x.put(
+                                            "protected",
+                                            s.getId().equalsIgnoreCase(props.adminEmail()));
                                     List<Map<String, Object>> ws = new ArrayList<>();
                                     for (DocumentSnapshot m :
                                             store.equal("memberships", "userEmail", s.getId())) {

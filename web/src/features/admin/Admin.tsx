@@ -195,7 +195,7 @@ function UsersTab() {
                 )}
                 {users.data.map((u) => {
                   const locked =
-                    u.email === "admin@hyperdatalab.org" ||
+                    u.protected ||
                     u.email === me.user.email;
                   return (
                     <TableRow key={u.email}>

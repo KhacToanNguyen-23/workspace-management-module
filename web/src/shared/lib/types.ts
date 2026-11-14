@@ -35,6 +35,8 @@ export interface AdminUser {
   directoryStatus: string;
   role: GlobalRole;
   disabled: boolean;
+  /** The configured first admin (ADMIN_EMAIL); cannot be changed. */
+  protected?: boolean;
   disabledAt: string | null;
   disabledBy: string | null;
   lastSeen: string | null;

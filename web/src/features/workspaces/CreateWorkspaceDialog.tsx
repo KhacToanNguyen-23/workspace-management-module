@@ -19,7 +19,19 @@ import {
 import { useApi, useQuery } from "../../shared/lib/api";
 import { useTr } from "../entry/i18n";
 
-const EMPTY = { name: "", type: "research", description: "", reason: "" };
+const EMPTY = {
+  name: "",
+  type: "research",
+  description: "",
+  reason: "",
+  members: "",
+};
+
+/** Splits the members box on commas, semicolons, spaces and new lines. */
+const emails = (text: string) =>
+  [...new Set(text.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()))].filter(
+    Boolean,
+  );
 
 /**
  * One form for both ways of getting a workspace. Admins and workspace managers create it straight
@@ -49,16 +61,23 @@ export function CreateWorkspaceDialog({
   const submit = async () => {
     if (isCreate) {
       const { name, type, description } = form;
+      const members = emails(form.members);
       const r = await act.run(() =>
-        api<{ id: string }>("POST", "/workspaces", { name, type, description }),
+        api<{ id: string }>("POST", "/workspaces", {
+          name,
+          type,
+          description,
+          members,
+        }),
       );
       if (r) {
         setForm(EMPTY);
         onDone(r.id);
       }
     } else {
+      const { members: _members, ...request } = form;
       const r = await act.run(() =>
-        api("POST", "/workspace-requests", form),
+        api("POST", "/workspace-requests", request),
       );
       if (r !== undefined) {
         setForm(EMPTY);
@@ -122,6 +141,21 @@ export function CreateWorkspaceDialog({
               }
             />
           </Field>
+          {isCreate && (
+            <Field
+              label="Thành viên"
+              htmlFor="cw-members"
+              hint="Tuỳ chọn · email @hyperdatalab.org, cách nhau bằng dấu phẩy hoặc xuống dòng"
+            >
+              <Textarea
+                id="cw-members"
+                rows={2}
+                placeholder="alice@hyperdatalab.org, bob@hyperdatalab.org"
+                value={form.members}
+                onChange={(e) => setForm({ ...form, members: e.target.value })}
+              />
+            </Field>
+          )}
           {!isCreate && (
             <Field label={tr("Lý do xin tạo")} htmlFor="cw-reason">
               <Textarea

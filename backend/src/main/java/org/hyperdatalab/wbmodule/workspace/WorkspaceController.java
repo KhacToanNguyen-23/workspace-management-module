@@ -12,13 +12,11 @@ import org.hyperdatalab.wbmodule.auth.AuthedUser;
 import org.hyperdatalab.wbmodule.common.ApiException;
 import org.hyperdatalab.wbmodule.common.Locations;
 import org.hyperdatalab.wbmodule.common.Paging;
-import org.hyperdatalab.wbmodule.directory.UserDirectory;
 import org.hyperdatalab.wbmodule.identity.AuditService;
 import org.hyperdatalab.wbmodule.identity.IdentityService;
 import org.hyperdatalab.wbmodule.store.FirestoreStore;
 import org.hyperdatalab.wbmodule.store.MembershipStore;
 import org.hyperdatalab.wbmodule.store.WorkspaceStore;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +37,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /** One workspace: its details, its memberships and its managers. */
 @RestController
@@ -49,7 +46,6 @@ public class WorkspaceController {
     private final AccessService access;
     private final AuditService audit;
     private final IdentityService identity;
-    private final UserDirectory directory;
     private final MembershipStore memberships;
     private final WorkspaceStore workspaces;
     private final WorkspaceService workspaceService;
@@ -59,7 +55,6 @@ public class WorkspaceController {
             AccessService a,
             AuditService au,
             IdentityService i,
-            UserDirectory d,
             MembershipStore memberships,
             WorkspaceStore workspaces,
             WorkspaceService workspaceService) {
@@ -67,7 +62,6 @@ public class WorkspaceController {
         access = a;
         audit = au;
         identity = i;
-        directory = d;
         this.memberships = memberships;
         this.workspaces = workspaces;
         this.workspaceService = workspaceService;
@@ -204,21 +198,7 @@ public class WorkspaceController {
             AuthedUser u, @PathVariable String wid, @Valid @RequestBody AddBody b) {
         access.load(u, wid).requireManager();
         String e = b.email().toLowerCase(Locale.ROOT);
-        if (!identity.isOrgEmail(e))
-            throw ApiException.unprocessable(
-                    "wrong_domain", "Only addresses of the org domain can be added.");
-        var user = identity.find(e);
-        if (user.isEmpty() && !directory.mode().equals("off") && directory.find(e).isEmpty())
-            throw new ApiException(
-                    HttpStatus.NOT_FOUND,
-                    "not_in_directory",
-                    e + " is not registered under the org domain.");
-        if (user.map(
-                        x ->
-                                x.disabled()
-                                        || Set.of("missing", "suspended")
-                                                .contains(x.directoryStatus()))
-                .orElse(false)) throw ApiException.conflict("inactive_user", e + " is inactive.");
+        identity.requireAddable(e);
         String id = wid + "_" + e;
         // Built here: the transaction callback runs on another thread, without the request.
         URI location = Locations.of("/workspaces/{wid}/members/{mid}", wid, id);

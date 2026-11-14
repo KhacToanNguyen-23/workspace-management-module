@@ -9,6 +9,7 @@ export const EN: Record<string, string> = {
   "Yêu cầu download": "Download requests",
   "Quản lý workspace": "Manage workspace",
   "Tất cả workspace": "All workspaces",
+  "Dự án": "Projects",
   "Quản trị": "Administration",
   "Chọn workspace": "Select workspace",
   "Chọn workspace (đang chọn: {name})": "Select workspace (current: {name})",

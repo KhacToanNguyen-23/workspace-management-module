@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.hyperdatalab.wbmodule.common.ApiException;
 import org.hyperdatalab.wbmodule.common.ErrorHandler;
+import org.hyperdatalab.wbmodule.common.Locations;
 import org.hyperdatalab.wbmodule.directory.UserDirectory;
 import org.hyperdatalab.wbmodule.identity.IdentityService;
 import org.springframework.http.MediaType;
@@ -40,6 +41,10 @@ public class AuthFilter extends OncePerRequestFilter {
                 || path.equals("/api/health")
                 // Dev-only helpers; the controller exists only with app.auth.mode=dev.
                 || path.startsWith("/api/dev/")
+                // Signing in: exchanges an SSO authorization code for a session.
+                || (path.equals(Locations.API + "/sessions") && "POST".equals(req.getMethod()))
+                // Which scopes to ask the SSO for, before anyone is signed in.
+                || path.equals(Locations.API + "/sessions/options")
                 || "OPTIONS".equals(req.getMethod());
     }
 

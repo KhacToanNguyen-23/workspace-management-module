@@ -41,6 +41,7 @@ public abstract class IntegrationTest {
                         "memberships",
                         "workspaceRequests",
                         "downloadRequests",
+                        "sessions",
                         "auditLog")) {
             for (var doc : store.all(collection))
                 org.hyperdatalab.wbmodule.store.FirestoreStore.await(doc.getReference().delete());

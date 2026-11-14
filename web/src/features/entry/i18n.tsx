@@ -40,6 +40,7 @@ const dict = {
     loginBody: (domain: string) =>
       `Đăng nhập một lần (SSO) bằng tài khoản Google @${domain}. Tài khoản được đối chiếu với danh sách member của lab; sau khi vào, chọn workspace và chờ manager duyệt.`,
     loginGoogle: "Đăng nhập với Google",
+    loginSso: "Đăng nhập bằng tài khoản HyperDataLab",
     loginDevEmail: (domain: string) =>
       `Hoặc nhập email @${domain} bất kỳ (tạo member mới)`,
     loginDevSubmit: "Đăng nhập (dev)",
@@ -70,6 +71,7 @@ const dict = {
     loginBody: (domain: string) =>
       `Single sign-on with your @${domain} Google account. Your account is checked against the lab's member list; once inside, pick a workspace and wait for a manager to approve you.`,
     loginGoogle: "Sign in with Google",
+    loginSso: "Sign in with your HyperDataLab account",
     loginDevEmail: (domain: string) =>
       `Or enter any @${domain} email (creates a new member)`,
     loginDevSubmit: "Sign in (dev)",

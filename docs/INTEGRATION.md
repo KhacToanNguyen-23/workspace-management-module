@@ -21,6 +21,24 @@ Base path: `/api/v1`. Mọi route (trừ `GET /api/health` và `/api/dev/*` ở 
 - **Lỗi:** `{"error":{"code":"...","message":"..."}}` với `401` (kèm `WWW-Authenticate`), `403`, `404`, `405` (kèm `Allow`), `409` (xung đột trạng thái), `415` (body không phải JSON), `422` (dữ liệu sai), `502` (directory lỗi).
 - **Mô tả workspace** thống nhất ở mọi endpoint: `id, name, type, description, status, createdBy, createdAt, managers[], memberCount`, cùng `pendingCount` (admin và manager của workspace đó), `myStatus`/`myRole` (nếu caller có membership) và `canManage` (khi đọc một workspace).
 
+### Đăng nhập (chỉ khi `AUTH_MODE=sso`)
+
+| Method | Path | Mô tả |
+|---|---|---|
+| POST | `/api/v1/sessions` | Không cần token. Body `{code, codeVerifier, redirectUri}` lấy từ callback của HyperDataLab SSO. Trả `201 {token, expiresAt, user: {email, name}}`. Lỗi: `401 sso_rejected` (code sai hoặc hết hạn), `403 wrong_domain` / `unverified` / `disabled`, `422 invalid_redirect`, `502 sso_unavailable`. |
+| DELETE | `/api/v1/sessions/current` | Đăng xuất: session token hết hiệu lực ngay. Trả `204`. |
+
+### Dự án nghiên cứu (ResearchPulse)
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/v1/sessions/options?redirectUri=` | Không cần token: scope web nên xin khi đăng nhập SSO. |
+| GET | `/api/v1/projects` | Dự án của người đăng nhập (`listsAll: false`) hoặc dự án mẫu. |
+| GET | `/api/v1/projects/{id}` | Chi tiết kèm `members`. |
+| POST / PATCH / DELETE | `/api/v1/projects/{id}/members[/{uid}]` | Admin; `501 not_supported` khi ResearchPulse chưa cho ghi. |
+
+Xem README, mục "Dự án nghiên cứu".
+
 ### Hồ sơ và catalogue
 
 | Method | Path | Mô tả |
@@ -29,7 +47,7 @@ Base path: `/api/v1`. Mọi route (trừ `GET /api/health` và `/api/dev/*` ở 
 | GET | `/api/v1/workspace-types` | Loại workspace. |
 | POST | `/api/v1/workspace-types` | Admin; thêm loại workspace. |
 | GET | `/api/v1/workspaces?status=active\|archived\|all` | Danh sách workspace kèm trạng thái membership của caller. `archived` và `all` chỉ dành cho admin. |
-| POST | `/api/v1/workspaces` | `workspace_manager` hoặc admin; tạo workspace `{name, type, description, managers?}`. Chỉ admin được chọn `managers`; mặc định người tạo là manager. |
+| POST | `/api/v1/workspaces` | `workspace_manager` hoặc admin; tạo workspace `{name, type, description, managers?, members?}`. Chỉ admin được chọn `managers`; mặc định người tạo là manager. `members` (tối đa 100 email) được thêm ngay với trạng thái đã duyệt; mọi email được kiểm tra trước, một email sai (`422 wrong_domain`, `404 not_in_directory`, `409 inactive_user`) thì không tạo gì. |
 | GET | `/api/v1/workspace-requests?status=&requester=me` | Admin thấy mọi yêu cầu tạo workspace (kèm thông tin người gửi); người khác chỉ thấy của mình. |
 | POST | `/api/v1/workspace-requests` | Gửi yêu cầu tạo workspace `{name, type, description?, reason?}`. |
 | GET | `/api/v1/workspace-requests/{id}` | Admin hoặc người gửi. |

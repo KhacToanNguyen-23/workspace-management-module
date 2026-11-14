@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Navigate,
   NavLink,
@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronsUpDown,
   FileDown,
+  FolderKanban,
   Layers,
   LayoutList,
   LogOut,
@@ -53,9 +54,12 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AdminPage } from "../features/admin/Admin";
 import { LoginPage } from "../features/auth/Login";
+import { SsoCallbackPage } from "../features/auth/SsoCallback";
+import { isSsoReturn } from "../features/auth/sso";
 import { AUTH_MODE, useAuth } from "../features/auth/auth";
 import { DevAccountMenu } from "../features/auth/DevAccounts";
 import { EntryPage } from "../features/entry/EntryPage";
+import { ProjectDetailPage, ProjectsPage } from "../features/projects/Projects";
 import { DownloadsPage } from "../features/workspaces/Downloads";
 import { MembersPage } from "../features/workspaces/Members";
 import { OnboardingPage } from "../features/workspaces/Onboarding";
@@ -346,6 +350,7 @@ function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <NavItem to="/projects" icon={FolderKanban} label={tr("Dự án")} />
               <NavItem to="/onboarding" icon={UserPlus} label={tr("Tất cả workspace")} />
               {me.user.isAdmin && (
                 <NavItem
@@ -520,6 +525,17 @@ function WorkspaceRoute() {
 }
 
 export function App() {
+  // The SSO may return to any registered URL of the app (even "/"), so the sign-in is finished
+  // wherever its ?code&state arrive. The query is captured once: completing the sign-in removes
+  // the pending attempt, and this must keep rendering until the navigation that follows.
+  const [ssoReturn] = useState(() =>
+    AUTH_MODE === "sso" && isSsoReturn(window.location.search)
+      ? window.location.search
+      : null,
+  );
+  const { search } = useLocation();
+  if (ssoReturn !== null && search === ssoReturn)
+    return <SsoCallbackPage search={ssoReturn} />;
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
@@ -529,6 +545,8 @@ export function App() {
         <Route path="onboarding" element={<OnboardingPage />} />
         <Route path="create-workspace" element={<Navigate to="/onboarding" replace />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:pid" element={<ProjectDetailPage />} />
         <Route path="w/:wid" element={<WorkspaceRoute />}>
           <Route index element={<WorkspaceHomePage />} />
           <Route path="downloads" element={<DownloadsPage />} />

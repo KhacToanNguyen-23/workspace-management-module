@@ -11,13 +11,13 @@ import org.hyperdatalab.wbmodule.common.ApiException;
 import org.hyperdatalab.wbmodule.common.Locations;
 import org.hyperdatalab.wbmodule.common.Paging;
 import org.hyperdatalab.wbmodule.identity.AuditService;
+import org.hyperdatalab.wbmodule.identity.IdentityService;
 import org.hyperdatalab.wbmodule.store.FirestoreStore;
 import org.hyperdatalab.wbmodule.store.MembershipStore;
 import org.hyperdatalab.wbmodule.store.WorkspaceRequestStore;
 import org.hyperdatalab.wbmodule.store.WorkspaceStore;
 import org.hyperdatalab.wbmodule.workspace.WorkspaceService;
 import org.hyperdatalab.wbmodule.workspace.WorkspaceViews;
-import org.hyperdatalab.wbmodule.workspace.WorkspaceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,6 +45,7 @@ public class MeController {
     private final MembershipStore memberships;
     private final WorkspaceStore workspaceStore;
     private final WorkspaceRequestStore workspaceRequests;
+    private final IdentityService identity;
 
     public MeController(
             FirestoreStore s,
@@ -52,13 +53,15 @@ public class MeController {
             AuditService a,
             MembershipStore memberships,
             WorkspaceStore workspaceStore,
-            WorkspaceRequestStore workspaceRequests) {
+            WorkspaceRequestStore workspaceRequests,
+            IdentityService identity) {
         store = s;
         workspaces = w;
         audit = a;
         this.memberships = memberships;
         this.workspaceStore = workspaceStore;
         this.workspaceRequests = workspaceRequests;
+        this.identity = identity;
     }
 
     /** Returns the current user, memberships and latest workspace request. */
@@ -191,11 +194,14 @@ public class MeController {
             @NotBlank @Size(max = 120) String name,
             @NotBlank String type,
             @Size(max = 1000) String description,
-            List<@Email String> managers) {}
+            List<@Email String> managers,
+            @Size(max = 100) List<@Email String> members) {}
 
     /**
      * Creates a workspace. Workspace managers become its manager; administrators may list the
-     * initial managers (they manage it themselves when the list is empty).
+     * initial managers (they manage it themselves when the list is empty). {@code members} are
+     * added as approved members straight away; every address is checked before anything is
+     * written, so one bad address creates nothing.
      */
     @PostMapping("/workspaces")
     ResponseEntity<Map<String, Object>> createWorkspace(
@@ -212,7 +218,18 @@ public class MeController {
                                 .distinct()
                                 .toList()
                         : List.of(u.email());
-        String id = workspaces.create(u, b.name(), b.type(), b.description(), managers.get(0));
+        List<String> members =
+                b.members() == null
+                        ? List.of()
+                        : b.members().stream()
+                                .map(x -> x.toLowerCase(Locale.ROOT))
+                                .distinct()
+                                .filter(x -> !managers.contains(x))
+                                .toList();
+        members.forEach(identity::requireAddable);
+        String id =
+                workspaces.create(
+                        u, b.name(), b.type(), b.description(), managers.get(0), members);
         for (int i = 1; i < managers.size(); i++) workspaces.addManager(u, id, managers.get(i));
         return ResponseEntity.created(Locations.of("/workspaces/{id}", id))
                 .body(
@@ -224,6 +241,8 @@ public class MeController {
                                 "type",
                                 b.type(),
                                 "managers",
-                                managers));
+                                managers,
+                                "members",
+                                members));
     }
 }

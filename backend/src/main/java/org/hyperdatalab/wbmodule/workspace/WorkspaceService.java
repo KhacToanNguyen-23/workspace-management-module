@@ -114,10 +114,18 @@ public class WorkspaceService {
             String name,
             String type,
             String description,
-            String managerEmail) {
+            String managerEmail,
+            List<String> members) {
         return firestore.transaction(
                 transaction ->
-                        create(transaction, actor, name, type, description, managerEmail));
+                        create(
+                                transaction,
+                                actor,
+                                name,
+                                type,
+                                description,
+                                managerEmail,
+                                members));
     }
 
     public String create(
@@ -127,6 +135,22 @@ public class WorkspaceService {
             String type,
             String description,
             String managerEmail) {
+        return create(transaction, actor, name, type, description, managerEmail, List.of());
+    }
+
+    /**
+     * Creates the workspace with {@code managerEmail} as manager and {@code members} (already
+     * checked with {@link IdentityService#requireAddable}, none of them the manager) as approved
+     * members.
+     */
+    public String create(
+            Transaction transaction,
+            AuthedUser actor,
+            String name,
+            String type,
+            String description,
+            String managerEmail,
+            List<String> members) {
         DocumentReference typeRef = firestore.doc("workspaceTypes", type);
         DocumentReference userRef = firestore.doc("users", managerEmail);
         if (!FirestoreStore.await(transaction.get(typeRef)).exists()) {
@@ -169,7 +193,7 @@ public class WorkspaceService {
                         managerEmail,
                         now,
                         List.of(managerEmail),
-                        1,
+                        1 + members.size(),
                         0));
         memberships.save(
                 transaction,
@@ -184,6 +208,22 @@ public class WorkspaceService {
                         actor.email(),
                         now,
                         ""));
+        for (String member : members) {
+            memberships.save(
+                    transaction,
+                    new MembershipStore.Membership(
+                            id + "_" + member,
+                            id,
+                            member,
+                            "member",
+                            "approved",
+                            "",
+                            now,
+                            actor.email(),
+                            now,
+                            "added at creation"));
+            audit.log(transaction, actor.email(), "membership.add", member, id, Map.of());
+        }
         audit.log(
                 transaction,
                 actor.email(),
