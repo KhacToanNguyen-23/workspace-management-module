@@ -38,9 +38,18 @@ const dict = {
     // Login
     loginTitle: "Đăng nhập HyperSpace",
     loginBody: (domain: string) =>
-      `Đăng nhập một lần (SSO) bằng tài khoản Google @${domain}. Tài khoản được đối chiếu với danh sách member của lab; sau khi vào, chọn workspace và chờ manager duyệt.`,
+      `Dùng tài khoản @${domain} để đăng nhập và tiếp tục vào HyperSpace.`,
     loginGoogle: "Đăng nhập với Google",
     loginSso: "Đăng nhập bằng tài khoản HyperDataLab",
+    ssoRedirectTitle: "Xác thực qua HyperDataLab",
+    ssoRedirectBody:
+      "Bạn sẽ được chuyển tới trang đăng nhập HyperDataLab. Sau khi xác thực, hệ thống sẽ tự đưa bạn trở lại HyperSpace.",
+    ssoRedirecting: "Đang chuyển tới HyperDataLab…",
+    ssoCallbackTitle: "Đang xác thực tài khoản",
+    ssoCallbackBody:
+      "HyperDataLab đang xác nhận thông tin đăng nhập. Bạn sẽ tự quay lại HyperSpace sau giây lát.",
+    ssoFailureTitle: "Không thể đăng nhập",
+    ssoRetry: "Quay lại đăng nhập",
     loginDevEmail: (domain: string) =>
       `Hoặc nhập email @${domain} bất kỳ (tạo member mới)`,
     loginDevSubmit: "Đăng nhập (dev)",
@@ -69,9 +78,18 @@ const dict = {
     langLabel: "Language",
     loginTitle: "Sign in to HyperSpace",
     loginBody: (domain: string) =>
-      `Single sign-on with your @${domain} Google account. Your account is checked against the lab's member list; once inside, pick a workspace and wait for a manager to approve you.`,
+      `Use your @${domain} account to sign in and continue to HyperSpace.`,
     loginGoogle: "Sign in with Google",
     loginSso: "Sign in with your HyperDataLab account",
+    ssoRedirectTitle: "Verify with HyperDataLab",
+    ssoRedirectBody:
+      "You’ll continue to HyperDataLab’s sign-in page. After verification, you’ll be returned to HyperSpace automatically.",
+    ssoRedirecting: "Opening HyperDataLab…",
+    ssoCallbackTitle: "Verifying your account",
+    ssoCallbackBody:
+      "HyperDataLab is confirming your sign-in. You’ll return to HyperSpace in a moment.",
+    ssoFailureTitle: "Sign-in failed",
+    ssoRetry: "Back to sign in",
     loginDevEmail: (domain: string) =>
       `Or enter any @${domain} email (creates a new member)`,
     loginDevSubmit: "Sign in (dev)",
