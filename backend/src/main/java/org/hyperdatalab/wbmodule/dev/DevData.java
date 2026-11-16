@@ -208,6 +208,12 @@ public class DevData implements CommandLineRunner {
 
     private void createIfMissing(String collection, String id, Map<String, Object> data) {
         DocumentReference ref = store.doc(collection, id);
-        if (!FirestoreStore.await(ref.get()).exists()) FirestoreStore.await(ref.create(data));
+        if (FirestoreStore.await(ref.get()).exists()) return;
+        try {
+            FirestoreStore.await(ref.create(data));
+        } catch (com.google.api.gax.rpc.AlreadyExistsException e) {
+            // Created meanwhile, e.g. by a sign-in while the backend was still seeding: keep it.
+            // Seeding runs at start-up, so letting this through would stop the whole backend.
+        }
     }
 }
