@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HyperSpaceMark } from "../../shared/components/Brand";
@@ -15,11 +15,18 @@ export function LoginPage() {
     useAuth();
   const { t, lang, setLang } = useLang();
   const [email, setEmail] = useState("");
+  const [redirecting, setRedirecting] = useState(false);
   const from = (useLocation().state as { from?: string } | null)?.from;
   // Only same-site paths are accepted as a return target (no open redirect).
   const target =
     from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
   if (ready && session) return <Navigate to={target} replace />;
+
+  const continueWithSso = async () => {
+    setRedirecting(true);
+    const started = await signInSso(target);
+    if (!started) setRedirecting(false);
+  };
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -43,9 +50,32 @@ export function LoginPage() {
           </p>
           <div className="mt-6 grid gap-5">
             {AUTH_MODE === "sso" ? (
-              <Button className="w-full" onClick={() => void signInSso(target)}>
-                {t.loginSso}
-              </Button>
+              <div className="rounded-xl border bg-card p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ShieldCheck className="size-4" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{t.ssoRedirectTitle}</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                      {t.ssoRedirectBody}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  className="mt-4 w-full"
+                  onClick={() => void continueWithSso()}
+                  disabled={redirecting}
+                  aria-busy={redirecting}
+                >
+                  {redirecting ? (
+                    <LoaderCircle className="animate-spin" aria-hidden />
+                  ) : (
+                    <ArrowUpRight aria-hidden />
+                  )}
+                  {redirecting ? t.ssoRedirecting : t.loginSso}
+                </Button>
+              </div>
             ) : AUTH_MODE === "firebase" ? (
               <Button className="w-full" onClick={() => void signInGoogle()}>
                 {t.loginGoogle}

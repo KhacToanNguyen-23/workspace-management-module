@@ -51,7 +51,7 @@ interface AuthState {
   error: string;
   signInGoogle(): Promise<void>;
   /** Leaves for the SSO; `returnTo` is the in-app path to open after signing in. */
-  signInSso(returnTo: string): Promise<void>;
+  signInSso(returnTo: string): Promise<boolean>;
   /** Finishes an SSO sign-in on /auth/callback and returns the path to open. */
   completeSso(search: string): Promise<string>;
   signInDev(email: string): void;
@@ -177,8 +177,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError("");
     try {
       await startSsoSignIn(returnTo);
+      return true;
     } catch (e) {
       setError(`Đăng nhập thất bại: ${String((e as Error).message ?? e)}`);
+      return false;
     }
   }, []);
 
