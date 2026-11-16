@@ -8,18 +8,18 @@ import java.util.Map;
 
 class AdminApiTest extends IntegrationTest {
     private void makeAliceAdmin() throws Exception {
-        get("/api/me", ALICE);
-        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("role", "admin"));
+        get("/api/v1/me", ALICE);
+        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("role", "admin"));
     }
 
     @Test
     void adminCanPromoteMemberToWorkspaceManager() throws Exception {
-        get("/api/me", ALICE);
+        get("/api/v1/me", ALICE);
 
         assertThat(
                         call(
                                         "PATCH",
-                                        "/api/admin/users/" + ALICE,
+                                        "/api/v1/users/" + ALICE,
                                         ADMIN,
                                         Map.of("role", "workspace_manager"))
                                 .status())
@@ -28,11 +28,11 @@ class AdminApiTest extends IntegrationTest {
 
     @Test
     void adminCanDemoteWorkspaceManagerWithoutActiveWorkspace() throws Exception {
-        get("/api/me", ALICE);
-        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("role", "workspace_manager"));
+        get("/api/v1/me", ALICE);
+        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("role", "workspace_manager"));
 
         assertThat(
-                        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("role", "member"))
+                        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("role", "member"))
                                 .status())
                 .isEqualTo(200);
     }
@@ -44,7 +44,7 @@ class AdminApiTest extends IntegrationTest {
         assertThat(
                         call(
                                         "PATCH",
-                                        "/api/admin/users/" + MANAGER,
+                                        "/api/v1/users/" + MANAGER,
                                         ADMIN,
                                         Map.of("role", "member"))
                                 .code())
@@ -56,14 +56,14 @@ class AdminApiTest extends IntegrationTest {
         String workspaceId = seedWorkspace("research");
         call(
                 "POST",
-                "/api/admin/workspaces/" + workspaceId + "/managers",
+                "/api/v1/workspaces/" + workspaceId + "/managers",
                 ADMIN,
                 Map.of("email", ALICE));
 
         assertThat(
                         call(
                                         "PATCH",
-                                        "/api/admin/users/" + MANAGER,
+                                        "/api/v1/users/" + MANAGER,
                                         ADMIN,
                                         Map.of("role", "member"))
                                 .status())
@@ -72,28 +72,28 @@ class AdminApiTest extends IntegrationTest {
 
     @Test
     void adminCanDisableUserAndDisabledUserCannotSignIn() throws Exception {
-        get("/api/me", ALICE);
-        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("disabled", true));
+        get("/api/v1/me", ALICE);
+        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("disabled", true));
 
-        assertThat(get("/api/me", ALICE).code()).isEqualTo("disabled");
+        assertThat(get("/api/v1/me", ALICE).code()).isEqualTo("disabled");
     }
 
     @Test
     void adminCanEnablePreviouslyDisabledUser() throws Exception {
-        get("/api/me", ALICE);
-        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("disabled", true));
+        get("/api/v1/me", ALICE);
+        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("disabled", true));
 
         assertThat(
-                        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("disabled", false))
+                        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("disabled", false))
                                 .status())
                 .isEqualTo(200);
-        assertThat(get("/api/me", ALICE).status()).isEqualTo(200);
+        assertThat(get("/api/v1/me", ALICE).status()).isEqualTo(200);
     }
 
     @Test
     void adminCannotDisableProtectedDomainAdmin() throws Exception {
         assertThat(
-                        call("PATCH", "/api/admin/users/" + ADMIN, ADMIN, Map.of("disabled", true))
+                        call("PATCH", "/api/v1/users/" + ADMIN, ADMIN, Map.of("disabled", true))
                                 .code())
                 .isEqualTo("protected");
     }
@@ -101,7 +101,7 @@ class AdminApiTest extends IntegrationTest {
     @Test
     void adminCannotChangeProtectedDomainAdminRole() throws Exception {
         assertThat(
-                        call("PATCH", "/api/admin/users/" + ADMIN, ADMIN, Map.of("role", "member"))
+                        call("PATCH", "/api/v1/users/" + ADMIN, ADMIN, Map.of("role", "member"))
                                 .code())
                 .isEqualTo("protected");
     }
@@ -111,7 +111,7 @@ class AdminApiTest extends IntegrationTest {
         makeAliceAdmin();
 
         assertThat(
-                        call("PATCH", "/api/admin/users/" + ALICE, ALICE, Map.of("disabled", true))
+                        call("PATCH", "/api/v1/users/" + ALICE, ALICE, Map.of("disabled", true))
                                 .code())
                 .isEqualTo("self_change");
     }
@@ -121,26 +121,26 @@ class AdminApiTest extends IntegrationTest {
         makeAliceAdmin();
 
         assertThat(
-                        call("PATCH", "/api/admin/users/" + ALICE, ALICE, Map.of("role", "member"))
+                        call("PATCH", "/api/v1/users/" + ALICE, ALICE, Map.of("role", "member"))
                                 .code())
                 .isEqualTo("self_change");
     }
 
     @Test
     void nonAdminCannotUseAdminEndpoints() throws Exception {
-        assertThat(get("/api/admin/users", ALICE).status()).isEqualTo(403);
+        assertThat(get("/api/v1/users", ALICE).status()).isEqualTo(403);
     }
 
     @Test
     void disabledUserCannotBeAssignedAsManager() throws Exception {
         String workspaceId = seedWorkspace("review");
-        get("/api/me", ALICE);
-        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("disabled", true));
+        get("/api/v1/me", ALICE);
+        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("disabled", true));
 
         assertThat(
                         call(
                                         "POST",
-                                        "/api/admin/workspaces/" + workspaceId + "/managers",
+                                        "/api/v1/workspaces/" + workspaceId + "/managers",
                                         ADMIN,
                                         Map.of("email", ALICE))
                                 .code())
@@ -152,11 +152,11 @@ class AdminApiTest extends IntegrationTest {
         String workspaceId = seedWorkspace("review");
         call(
                 "POST",
-                "/api/admin/workspaces/" + workspaceId + "/managers",
+                "/api/v1/workspaces/" + workspaceId + "/managers",
                 ADMIN,
                 Map.of("email", ALICE));
 
-        assertThat(get("/api/admin/audit", ADMIN).body().findValuesAsText("action"))
+        assertThat(get("/api/v1/audit-events", ADMIN).body().findValuesAsText("action"))
                 .contains("user.role");
     }
 }

@@ -11,6 +11,7 @@ import org.hyperdatalab.wbmodule.directory.UserDirectory.DirectoryUser;
 import org.hyperdatalab.wbmodule.store.UserStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,9 @@ import java.util.Optional;
 @Service
 public class IdentityService {
     private static final Logger log = LoggerFactory.getLogger(IdentityService.class);
+
+    /** How often a user's {@code lastSeen} is written back while they keep calling the API. */
+    private static final Duration LAST_SEEN_WRITE_INTERVAL = Duration.ofMinutes(5);
 
     public record UserRow(
             String email,
@@ -64,6 +68,39 @@ public class IdentityService {
 
     public Optional<UserRow> find(String email) {
         return users.find(email).map(this::row);
+    }
+
+    /**
+     * Throws unless {@code email} (lower case) is an org address that may join a workspace: known
+     * here or listed in the directory, and neither disabled nor missing/suspended.
+     */
+    public void requireAddable(String email) {
+        if (!isOrgEmail(email))
+            throw ApiException.unprocessable(
+                    "wrong_domain", "Only addresses of the org domain can be added.");
+        Optional<UserRow> user = find(email);
+        if (user.isEmpty() && !directory.mode().equals("off")) {
+            // Never signed in here: the directory decides.
+            DirectoryUser listed =
+                    directory
+                            .find(email)
+                            .orElseThrow(
+                                    () ->
+                                            new ApiException(
+                                                    HttpStatus.NOT_FOUND,
+                                                    "not_in_directory",
+                                                    email
+                                                            + " is not registered under the org"
+                                                            + " domain."));
+            if (listed.suspended())
+                throw ApiException.conflict("inactive_user", email + " is inactive.");
+        }
+        if (user.map(
+                        x ->
+                                x.disabled()
+                                        || "missing".equals(x.directoryStatus())
+                                        || "suspended".equals(x.directoryStatus()))
+                .orElse(false)) throw ApiException.conflict("inactive_user", email + " is inactive.");
     }
 
     private static OffsetDateTime time(Object v) {
@@ -137,6 +174,16 @@ public class IdentityService {
         vals.put("directoryStatus", status);
         vals.put("lastSeen", Timestamp.now());
         if (check) vals.put("syncedAt", Timestamp.now());
+        // Reads should not turn into a write: keep the stored profile when it is recent enough.
+        boolean fresh =
+                prior.isPresent()
+                        && !check
+                        && prior.get().lastSeen() != null
+                        && prior.get()
+                                .lastSeen()
+                                .isAfter(OffsetDateTime.now().minus(LAST_SEEN_WRITE_INTERVAL))
+                        && (!forced || "admin".equals(prior.get().globalRole()));
+        if (!fresh)
         users.transaction(
                 tx -> {
                     UserStore.User existing = users.find(tx, email).orElse(null);
@@ -158,7 +205,7 @@ public class IdentityService {
                         audit.log(tx, email, "user.first_sign_in", email, null, Map.of());
                     return null;
                 });
-        UserRow saved = find(email).orElseThrow();
+        UserRow saved = fresh ? prior.get() : find(email).orElseThrow();
         if (status.equals("missing"))
             throw ApiException.forbidden(
                     "not_in_directory",
@@ -171,6 +218,28 @@ public class IdentityService {
             throw ApiException.forbidden(
                     "disabled", "This account was disabled by an administrator.");
         return new AuthedUser(email, saved.name(), saved.globalRole());
+    }
+
+    /**
+     * Stores what the SSO said about a user who just signed in. The SSO only releases a profile
+     * that is approved and active, so the user counts as {@code active} from here on.
+     */
+    public void applySsoProfile(
+            String email,
+            String name,
+            String picture,
+            String major,
+            String ssoRole,
+            String studentId) {
+        Map<String, Object> d = new HashMap<>();
+        if (name != null && !name.isBlank()) d.put("name", name);
+        if (picture != null) d.put("photoUrl", picture);
+        if (major != null) d.put("department", major);
+        if (ssoRole != null) d.put("ssoRole", ssoRole);
+        if (studentId != null) d.put("studentId", studentId);
+        d.put("directoryStatus", "active");
+        d.put("syncedAt", Timestamp.now());
+        users.merge(email, d);
     }
 
     public String refreshFromDirectory(String email) {
@@ -196,8 +265,40 @@ public class IdentityService {
 
     public record SyncResult(int listed, int missing, String mode) {}
 
+    /**
+     * A sync marks everyone it does not list as {@code missing}. A directory that answers with an
+     * empty or truncated list (an outage, a paging bug) would do that to most users at once, so
+     * such an answer is refused:
+     * an empty list, or one under half of the users it listed last time (from 10 users up), is
+     * refused and nothing is written.
+     */
+    static void requirePlausible(int listed, long known) {
+        if (listed == 0 && known > 0)
+            throw new UserDirectory.DirectoryException(
+                    "User directory returned no users; sync skipped.");
+        if (known >= 10 && listed < known / 2)
+            throw new UserDirectory.DirectoryException(
+                    "User directory returned "
+                            + listed
+                            + " users but "
+                            + known
+                            + " are listed here; sync skipped.");
+    }
+
     public SyncResult syncDirectory(String actor) {
+        if (directory.mode().equals("off"))
+            throw ApiException.conflict(
+                    "directory_off", "No user directory is configured; there is nothing to sync.");
         List<DirectoryUser> list = directory.listAll();
+        // The users this sync could mark missing: those the directory listed last time.
+        requirePlausible(
+                list.size(),
+                users.all().stream()
+                        .filter(
+                                x ->
+                                        "active".equals(x.directoryStatus())
+                                                || "suspended".equals(x.directoryStatus()))
+                        .count());
         List<UserStore.DirectorySnapshot> snapshot =
                 list.stream()
                         .map(

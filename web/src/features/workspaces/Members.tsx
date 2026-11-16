@@ -1,32 +1,64 @@
+import { useState } from "react";
+import { MoreHorizontal, UserPlus } from "lucide-react";
 import { useMe, useWorkspace } from "../../app/contexts";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { AuditTable } from "../../shared/components/AuditTable";
 import {
   Badge,
+  EmptyRow,
   ErrorBox,
   Loading,
+  PageBody,
   PageHeader,
-  fmtDate,
+  Section,
+  Stacked,
+  fmtShort,
   useAction,
+  useAsk,
+  ScrollList,
 } from "../../shared/components/ui";
-import { AuditTable } from "../../shared/components/AuditTable";
 import { useApi, useQuery } from "../../shared/lib/api";
 import {
   type AuditRow,
   type MemberRow,
   ROLE_LABEL,
 } from "../../shared/lib/types";
-import { useState } from "react";
+import { useTr } from "../entry/i18n";
 
 export function MembersPage() {
+  const tr = useTr();
   const { info } = useWorkspace();
   const { me, reload: reloadMe } = useMe();
   const wid = info.workspace.id;
   const api = useApi();
   const act = useAction();
-  const members = useQuery<MemberRow[]>(`/w/${wid}/members`);
-  const audit = useQuery<AuditRow[]>(`/w/${wid}/audit?limit=50`);
+  const { ask, dialog } = useAsk();
+  const members = useQuery<MemberRow[]>(`/workspaces/${wid}/members?limit=500`);
+  const audit = useQuery<AuditRow[]>(
+    `/audit-events?workspaceId=${wid}&limit=50`,
+  );
   const [email, setEmail] = useState("");
   if (!info.canManage)
-    return <ErrorBox error="Bạn không có quyền quản lý workspace này." />;
+    return (
+      <PageBody>
+        <ErrorBox error={tr("Bạn không có quyền quản lý workspace này.")} />
+      </PageBody>
+    );
   const refresh = () => {
     members.reload();
     audit.reload();
@@ -34,160 +66,265 @@ export function MembersPage() {
   };
   const decide = (
     id: string,
-    what: "approve" | "reject" | "revoke",
+    status: "approved" | "rejected" | "revoked",
     body: object = {},
   ) =>
     void act
-      .run(() => api("POST", `/w/${wid}/members/${id}/${what}`, body))
+      .run(() =>
+        api("PATCH", `/workspaces/${wid}/members/${id}`, { status, ...body }),
+      )
       .then(refresh);
+  const reject = async (m: MemberRow) => {
+    const note = await ask({
+      title: tr("Từ chối {email}?", { email: m.email }),
+      noteLabel: tr("Lý do từ chối"),
+      confirmLabel: tr("Từ chối"),
+      destructive: true,
+    });
+    if (note !== null) decide(m.id, "rejected", { note });
+  };
+  const revoke = async (m: MemberRow) => {
+    const ok = await ask({
+      title: tr("Thu hồi quyền của {email}?", { email: m.email }),
+      description: tr("Người này sẽ không còn truy cập workspace."),
+      confirmLabel: tr("Thu hồi"),
+      destructive: true,
+    });
+    if (ok !== null) decide(m.id, "revoked");
+  };
   const rows = members.data ?? [];
   const pending = rows.filter((m) => m.status === "pending"),
     approved = rows.filter((m) => m.status === "approved"),
     past = rows.filter((m) => ["rejected", "revoked"].includes(m.status));
+
   return (
-    <div>
+    <>
       <PageHeader
-        title={`Quản lý workspace · ${info.workspace.name}`}
-        sub="Duyệt yêu cầu tham gia và quản lý thành viên."
+        title={tr("Quản lý workspace")}
+        sub={info.workspace.name}
+        actions={
+          <form
+            className="hidden items-center gap-2 sm:flex"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void act
+                .run(() => api("POST", `/workspaces/${wid}/members`, { email }))
+                .then((r) => {
+                  if (r !== undefined) setEmail("");
+                  refresh();
+                });
+            }}
+          >
+            <Input
+              type="email"
+              aria-label={tr("Email thành viên cần thêm")}
+              placeholder="ten@hyperdatalab.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-8 w-60 text-[13px]"
+            />
+            <Button
+              size="sm"
+              disabled={act.busy || !email}
+              className="min-w-(--size-action-sm)"
+            >
+              <UserPlus />
+              {tr("Thêm")}
+            </Button>
+          </form>
+        }
       />
-      <ErrorBox error={act.error ?? members.error} />
-      <section className="card">
-        <h3>Yêu cầu chờ duyệt ({pending.length})</h3>
-        {!members.data ? (
-          <Loading />
-        ) : pending.length === 0 ? (
-          <p className="muted">Không có yêu cầu nào.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Người xin</th>
-                <th>Lời nhắn</th>
-                <th>Gửi lúc</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {pending.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    {m.name || m.email}
-                    <div className="small muted">
-                      {m.email} {m.department && `· ${m.department}`}
-                    </div>
-                  </td>
-                  <td>{m.note || "—"}</td>
-                  <td>{fmtDate(m.requestedAt)}</td>
-                  <td className="row">
-                    <button
-                      className="primary"
-                      disabled={act.busy}
-                      onClick={() => decide(m.id, "approve")}
+      <PageBody>
+        <ErrorBox error={act.error ?? members.error} />
+        <Section title={tr("Chờ duyệt")} count={members.data ? pending.length : undefined}>
+          {!members.data ? (
+            <Loading />
+          ) : (
+            <ScrollList>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>{tr("Người xin")}</TableHead>
+                    <TableHead>{tr("Lời nhắn")}</TableHead>
+                    <TableHead className="w-36">{tr("Gửi lúc")}</TableHead>
+                    <TableHead className="w-44">
+                      <span className="sr-only">{tr("Thao tác")}</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pending.length === 0 && (
+                    <EmptyRow colSpan={4}>{tr("Không có yêu cầu nào.")}</EmptyRow>
+                  )}
+                  {pending.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell>
+                        <Stacked
+                          primary={m.name || m.email}
+                          secondary={`${m.email}${m.department ? ` · ${m.department}` : ""}`}
+                        />
+                      </TableCell>
+                      <TableCell className="text-[13px] text-muted-foreground">
+                        {m.note || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                        {fmtShort(m.requestedAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            className="min-w-(--size-action-sm)"
+                            size="sm"
+                            disabled={act.busy}
+                            onClick={() => decide(m.id, "approved")}
+                          >
+                            {tr("Duyệt")}
+                          </Button>
+                          <Button
+                            className="min-w-(--size-action-sm)"
+                            size="sm"
+                            variant="outline"
+                            disabled={act.busy}
+                            onClick={() => void reject(m)}
+                          >
+                            {tr("Từ chối")}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollList>
+          )}
+        </Section>
+
+        <Section title={tr("Thành viên")} count={members.data ? approved.length : undefined}>
+          {/* The add form lives in the toolbar on wider screens. */}
+          <form
+            className="flex gap-2 py-3 sm:hidden"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void act
+                .run(() => api("POST", `/workspaces/${wid}/members`, { email }))
+                .then((r) => {
+                  if (r !== undefined) setEmail("");
+                  refresh();
+                });
+            }}
+          >
+            <Input
+              type="email"
+              aria-label={tr("Email thành viên cần thêm")}
+              placeholder="ten@hyperdatalab.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-9 flex-1"
+            />
+            <Button className="min-w-(--size-action-sm)" disabled={act.busy || !email}>{tr("Thêm")}</Button>
+          </form>
+          <ScrollList>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{tr("Thành viên")}</TableHead>
+                  <TableHead className="w-40">{tr("Danh bạ")}</TableHead>
+                  <TableHead className="w-28">{tr("Vai trò")}</TableHead>
+                  <TableHead>{tr("Duyệt bởi")}</TableHead>
+                  <TableHead className="w-10">
+                    <span className="sr-only">{tr("Thao tác")}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {members.data && approved.length === 0 && (
+                  <EmptyRow colSpan={5}>{tr("Chưa có thành viên.")}</EmptyRow>
+                )}
+                {approved.map((m) => {
+                  const locked =
+                    (m.email === me.user.email && !me.user.isAdmin) ||
+                    (m.role === "manager" && !me.user.isAdmin);
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell>
+                        <Stacked primary={m.name || m.email} secondary={m.email} />
+                      </TableCell>
+                      <TableCell>
+                        <Badge value={m.directoryStatus} />
+                      </TableCell>
+                      <TableCell className="text-[13px]">
+                        {tr(ROLE_LABEL[m.role])}
+                      </TableCell>
+                      <TableCell>
+                        <Stacked
+                          primary={
+                            <span className="font-normal">
+                              {m.decidedBy || "—"}
+                            </span>
+                          }
+                          secondary={fmtShort(m.decidedAt)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {!locked && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={tr("Thao tác với {email}", { email: m.email })}
+                              >
+                                <MoreHorizontal />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                variant="destructive"
+                                disabled={act.busy}
+                                onSelect={() => void revoke(m)}
+                              >
+                                {tr("Thu hồi quyền")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollList>
+          {past.length > 0 && (
+            <details className="group border-t py-2 text-[13px]">
+              <summary className="cursor-pointer py-1 text-muted-foreground hover:text-foreground">
+                {tr("Đã từ chối / thu hồi ({count})", { count: past.length })}
+              </summary>
+              <ScrollList>
+                <ul className="divide-y">
+                  {past.map((m) => (
+                    <li
+                      key={m.id}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
                     >
-                      Duyệt
-                    </button>
-                    <button
-                      disabled={act.busy}
-                      onClick={() =>
-                        decide(m.id, "reject", {
-                          note: prompt("Lý do từ chối") ?? "",
-                        })
-                      }
-                    >
-                      Từ chối
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-      <section className="card">
-        <h3>Thành viên ({approved.length})</h3>
-        <form
-          className="row wrap"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void act
-              .run(() => api("POST", `/w/${wid}/members`, { email }))
-              .then((r) => {
-                if (r !== undefined) setEmail("");
-                refresh();
-              });
-          }}
-        >
-          <input
-            className="grow"
-            placeholder="Thêm trực tiếp: ten@hyperdatalab.org"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <button disabled={act.busy || !email}>Thêm</button>
-        </form>
-        <table>
-          <thead>
-            <tr>
-              <th>Thành viên</th>
-              <th>Danh bạ</th>
-              <th>Vai trò</th>
-              <th>Duyệt bởi</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {approved.map((m) => {
-              const locked =
-                (m.email === me.user.email && !me.user.isAdmin) ||
-                (m.role === "manager" && !me.user.isAdmin);
-              return (
-                <tr key={m.id}>
-                  <td>
-                    {m.name || m.email}
-                    <div className="small muted">{m.email}</div>
-                  </td>
-                  <td>
-                    <Badge value={m.directoryStatus} />
-                  </td>
-                  <td>{ROLE_LABEL[m.role]}</td>
-                  <td>
-                    {m.decidedBy || "—"}
-                    <div className="small muted">{fmtDate(m.decidedAt)}</div>
-                  </td>
-                  <td>
-                    {!locked && (
-                      <button
-                        className="link danger"
-                        disabled={act.busy}
-                        onClick={() =>
-                          confirm(`Thu hồi quyền của ${m.email}?`) &&
-                          decide(m.id, "revoke")
-                        }
-                      >
-                        Thu hồi
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {past.length > 0 && (
-          <details>
-            <summary>Đã từ chối / thu hồi ({past.length})</summary>
-            {past.map((m) => (
-              <p key={m.id}>
-                {m.email} · <Badge value={m.status} /> · {m.decisionNote || "—"}
-              </p>
-            ))}
-          </details>
-        )}
-      </section>
-      <section className="card">
-        <h3>Nhật ký</h3>
-        <AuditTable rows={audit.data} />
-      </section>
-    </div>
+                      <span>{m.email}</span>
+                      <Badge value={m.status} />
+                      <span className="text-muted-foreground">
+                        {m.decisionNote || "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollList>
+            </details>
+          )}
+        </Section>
+
+        <Section title={tr("Nhật ký")}>
+          <AuditTable rows={audit.data} />
+        </Section>
+      </PageBody>
+      {dialog}
+    </>
   );
 }

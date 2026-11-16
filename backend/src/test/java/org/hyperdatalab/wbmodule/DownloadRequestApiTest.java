@@ -16,7 +16,7 @@ class DownloadRequestApiTest extends IntegrationTest {
     private String createRequest(String workspaceId) throws Exception {
         return call(
                         "POST",
-                        "/api/w/" + workspaceId + "/download-requests",
+                        "/api/v1/workspaces/" + workspaceId + "/download-requests",
                         ALICE,
                         Map.of("paperRef", "10.1/example"))
                 .body()
@@ -34,7 +34,7 @@ class DownloadRequestApiTest extends IntegrationTest {
     private Res createResponse(String workspaceId) throws Exception {
         return call(
                 "POST",
-                "/api/w/" + workspaceId + "/download-requests",
+                "/api/v1/workspaces/" + workspaceId + "/download-requests",
                 ALICE,
                 Map.of("paperRef", "10.1/example"));
     }
@@ -42,7 +42,7 @@ class DownloadRequestApiTest extends IntegrationTest {
     @Test
     void pendingMemberCannotCreateDownloadRequest() throws Exception {
         String workspaceId = seedWorkspace("research");
-        call("POST", "/api/workspaces/" + workspaceId + "/join", ALICE, Map.of());
+        call("PUT", "/api/v1/workspaces/" + workspaceId + "/members/me", ALICE, Map.of());
 
         assertThat(createResponse(workspaceId).code()).isEqualTo("pending_approval");
     }
@@ -59,7 +59,7 @@ class DownloadRequestApiTest extends IntegrationTest {
         String workspaceId = workspaceWithApprovedMember();
         createRequest(workspaceId);
 
-        assertThat(get("/api/w/" + workspaceId + "/download-requests/mine", ALICE).body())
+        assertThat(get("/api/v1/workspaces/" + workspaceId + "/download-requests?requester=me", ALICE).body())
                 .hasSize(1);
     }
 
@@ -71,7 +71,7 @@ class DownloadRequestApiTest extends IntegrationTest {
         assertThat(
                         call(
                                         "DELETE",
-                                        "/api/w/" + workspaceId + "/download-requests/" + requestId,
+                                        "/api/v1/workspaces/" + workspaceId + "/download-requests/" + requestId,
                                         ALICE,
                                         null)
                                 .status())
@@ -83,15 +83,25 @@ class DownloadRequestApiTest extends IntegrationTest {
         String workspaceId = workspaceWithApprovedMember();
         createRequest(workspaceId);
 
-        assertThat(get("/api/w/" + workspaceId + "/download-requests", MANAGER).body()).hasSize(1);
+        assertThat(get("/api/v1/workspaces/" + workspaceId + "/download-requests", MANAGER).body()).hasSize(1);
     }
 
     @Test
-    void memberCannotListAllWorkspaceDownloadRequests() throws Exception {
+    void memberListingOnlyContainsTheirOwnRequests() throws Exception {
         String workspaceId = workspaceWithApprovedMember();
+        createRequest(workspaceId);
+        joinAndApprove(workspaceId, BOB, "member");
+        call(
+                "POST",
+                "/api/v1/workspaces/" + workspaceId + "/download-requests",
+                BOB,
+                Map.of("paperRef", "doi:bob"));
 
-        assertThat(get("/api/w/" + workspaceId + "/download-requests", ALICE).status())
-                .isEqualTo(403);
+        var own = get("/api/v1/workspaces/" + workspaceId + "/download-requests", ALICE).body();
+        assertThat(own).hasSize(1);
+        assertThat(own.get(0).path("requester").asText()).isEqualTo(ALICE);
+        assertThat(get("/api/v1/workspaces/" + workspaceId + "/download-requests", MANAGER).body())
+                .hasSize(2);
     }
 
     @Test
@@ -100,15 +110,13 @@ class DownloadRequestApiTest extends IntegrationTest {
         String requestId = createRequest(workspaceId);
 
         assertThat(
-                        call(
-                                        "POST",
-                                        "/api/w/"
+                        call("PATCH",
+                                        "/api/v1/workspaces/"
                                                 + workspaceId
                                                 + "/download-requests/"
-                                                + requestId
-                                                + "/approve",
+                                                + requestId,
                                         ALICE,
-                                        Map.of())
+                                        Map.of("status", "approved"))
                                 .status())
                 .isEqualTo(403);
     }
@@ -119,15 +127,13 @@ class DownloadRequestApiTest extends IntegrationTest {
         String requestId = createRequest(workspaceId);
 
         assertThat(
-                        call(
-                                        "POST",
-                                        "/api/w/"
+                        call("PATCH",
+                                        "/api/v1/workspaces/"
                                                 + workspaceId
                                                 + "/download-requests/"
-                                                + requestId
-                                                + "/approve",
+                                                + requestId,
                                         MANAGER,
-                                        Map.of("note", "ok"))
+                                        Map.of("status", "approved", "note", "ok"))
                                 .status())
                 .isEqualTo(200);
     }
@@ -138,15 +144,13 @@ class DownloadRequestApiTest extends IntegrationTest {
         String requestId = createRequest(workspaceId);
 
         assertThat(
-                        call(
-                                        "POST",
-                                        "/api/w/"
+                        call("PATCH",
+                                        "/api/v1/workspaces/"
                                                 + workspaceId
                                                 + "/download-requests/"
-                                                + requestId
-                                                + "/reject",
+                                                + requestId,
                                         MANAGER,
-                                        Map.of("note", "no"))
+                                        Map.of("status", "rejected", "note", "no"))
                                 .status())
                 .isEqualTo(200);
     }
@@ -158,7 +162,7 @@ class DownloadRequestApiTest extends IntegrationTest {
         assertThat(
                         call(
                                         "POST",
-                                        "/api/w/" + workspaceId + "/download-requests",
+                                        "/api/v1/workspaces/" + workspaceId + "/download-requests",
                                         ALICE,
                                         Map.of("paperRef", " "))
                                 .status())

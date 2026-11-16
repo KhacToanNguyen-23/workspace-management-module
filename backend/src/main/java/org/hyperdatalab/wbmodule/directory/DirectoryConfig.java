@@ -16,7 +16,9 @@ public class DirectoryConfig {
     @Bean
     UserDirectory userDirectory(AppProperties props, ObjectMapper json) {
         AppProperties.Directory d = props.directory();
-        return switch (d.mode()) {
+        // With the SSO, profiles come from the sign-in itself; a directory would overwrite them.
+        String mode = "sso".equals(props.auth().mode()) ? "off" : d.mode();
+        return switch (mode) {
             case "http" ->
                     new HttpUserDirectory(json, d.httpBaseUrl(), d.httpToken(), props.orgDomain());
             case "google" ->

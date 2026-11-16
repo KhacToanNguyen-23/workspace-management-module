@@ -35,6 +35,8 @@ export interface AdminUser {
   directoryStatus: string;
   role: GlobalRole;
   disabled: boolean;
+  /** The configured first admin (ADMIN_EMAIL); cannot be changed. */
+  protected?: boolean;
   disabledAt: string | null;
   disabledBy: string | null;
   lastSeen: string | null;
@@ -91,6 +93,32 @@ export interface WorkspaceInfo {
   role: WorkspaceRole | null;
   canManage: boolean;
 }
+/** GET /workspaces/{id}: the workspace plus what the caller may do in it. */
+export interface WorkspaceView {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  status: string;
+  managers: string[];
+  myRole?: WorkspaceRole;
+  canManage: boolean;
+}
+
+export function toWorkspaceInfo(v: WorkspaceView): WorkspaceInfo {
+  return {
+    workspace: {
+      id: v.id,
+      name: v.name,
+      type: v.type,
+      description: v.description,
+      status: v.status,
+    },
+    role: v.myRole ?? null,
+    canManage: v.canManage,
+  };
+}
+
 export interface MemberRow {
   id: string;
   email: string;
@@ -113,6 +141,9 @@ export interface AuditRow {
   target: string;
   workspaceId: string | null;
   detail: Record<string, unknown>;
+  /** Display names resolved by the API; null when the person or object no longer exists. */
+  actorName?: string | null;
+  targetName?: string | null;
 }
 export interface Person {
   email: string;

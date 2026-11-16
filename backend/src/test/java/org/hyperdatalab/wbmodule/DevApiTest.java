@@ -11,7 +11,7 @@ import java.util.Map;
 
 /** The dev-only demo data: one account per role and state, ready to use after a reset. */
 class DevApiTest extends IntegrationTest {
-    private static final String DEMO = "/api/w/" + DevData.WORKSPACE_ID;
+    private static final String DEMO = "/api/v1/workspaces/" + DevData.WORKSPACE_ID;
 
     private JsonNode account(String email) throws Exception {
         for (JsonNode a : get("/api/dev/accounts", null).body()) {
@@ -33,11 +33,11 @@ class DevApiTest extends IntegrationTest {
     void resetSeedsOneAccountPerRole() throws Exception {
         assertThat(call("POST", "/api/dev/reset", null, null).status()).isEqualTo(200);
 
-        assertThat(get("/api/me", ADMIN).body().path("user").path("role").asText())
+        assertThat(get("/api/v1/me", ADMIN).body().path("user").path("role").asText())
                 .isEqualTo("admin");
-        assertThat(get("/api/me", MANAGER).body().path("user").path("role").asText())
+        assertThat(get("/api/v1/me", MANAGER).body().path("user").path("role").asText())
                 .isEqualTo("workspace_manager");
-        assertThat(get("/api/me", ALICE).body().path("user").path("role").asText())
+        assertThat(get("/api/v1/me", ALICE).body().path("user").path("role").asText())
                 .isEqualTo("member");
         assertThat(account("disabled@hyperdatalab.org").path("disabled").asBoolean()).isTrue();
     }
@@ -69,12 +69,12 @@ class DevApiTest extends IntegrationTest {
     @Test
     void resetGivesTheAdminAPendingWorkspaceRequestToApprove() throws Exception {
         call("POST", "/api/dev/reset", null, null);
-        var pending = get("/api/admin/workspace-requests?status=pending", ADMIN).body();
+        var pending = get("/api/v1/workspace-requests?status=pending", ADMIN).body();
 
         assertThat(pending).hasSize(1);
         String id = pending.get(0).path("id").asText();
         var approved =
-                call("POST", "/api/admin/workspace-requests/" + id + "/approve", ADMIN, Map.of());
+                call("PATCH", "/api/v1/workspace-requests/" + id, ADMIN, Map.of("status", "approved"));
 
         assertThat(approved.status()).isEqualTo(200);
         assertThat(account("carol@hyperdatalab.org").path("role").asText())
@@ -84,7 +84,7 @@ class DevApiTest extends IntegrationTest {
     @Test
     void resetReflectsRoleChangesMadeLater() throws Exception {
         call("POST", "/api/dev/reset", null, null);
-        call("PATCH", "/api/admin/users/" + ALICE, ADMIN, Map.of("role", "workspace_manager"));
+        call("PATCH", "/api/v1/users/" + ALICE, ADMIN, Map.of("role", "workspace_manager"));
 
         assertThat(account(ALICE).path("role").asText()).isEqualTo("workspace_manager");
 

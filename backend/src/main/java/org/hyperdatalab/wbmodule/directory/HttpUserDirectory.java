@@ -11,9 +11,11 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Generic REST user directory — the "API from another party" that knows the org's users.
@@ -21,8 +23,13 @@ import java.util.Optional;
  * <pre>
  * GET {baseUrl}/users/{email}          → 200 {email,name,photoUrl,department,suspended} | 404
  * GET {baseUrl}/users?domain={domain}  → 200 [ ...same objects ] or {"users":[...]}
+ *     paged: {"users":[...], "nextPageToken":"t"} → next page is ...&pageToken=t,
+ *     until nextPageToken is missing or empty
  * Authorization: Bearer {token}        (when app.directory.http-token is set)
  * </pre>
+ *
+ * The contract is a placeholder until the ecosystem API is documented; adjust {@link #map} and
+ * the paging parameter names here when it is.
  */
 public class HttpUserDirectory implements UserDirectory {
     private final HttpClient http =
@@ -83,20 +90,41 @@ public class HttpUserDirectory implements UserDirectory {
         }
     }
 
+    /** Stops a directory that keeps handing out page tokens from looping forever. */
+    private static final int MAX_PAGES = 1000;
+
     @Override
     public List<DirectoryUser> listAll() {
-        HttpResponse<String> res =
-                get(baseUrl + "/users?domain=" + URLEncoder.encode(domain, StandardCharsets.UTF_8));
-        if (res.statusCode() >= 300)
-            throw new DirectoryException("User directory answered HTTP " + res.statusCode() + ".");
-        try {
-            JsonNode root = json.readTree(res.body());
+        String first = baseUrl + "/users?domain=" + URLEncoder.encode(domain, StandardCharsets.UTF_8);
+        List<DirectoryUser> out = new ArrayList<>();
+        Set<String> tokens = new HashSet<>();
+        String url = first;
+        for (int page = 0; url != null; page++) {
+            if (page == MAX_PAGES)
+                throw new DirectoryException("User directory returned too many pages.");
+            HttpResponse<String> res = get(url);
+            if (res.statusCode() >= 300)
+                throw new DirectoryException(
+                        "User directory answered HTTP " + res.statusCode() + ".");
+            JsonNode root;
+            try {
+                root = json.readTree(res.body());
+            } catch (Exception e) {
+                throw new DirectoryException("User directory returned invalid JSON.");
+            }
             JsonNode arr = root.isArray() ? root : root.path("users");
-            List<DirectoryUser> out = new ArrayList<>();
+            if (!arr.isArray())
+                throw new DirectoryException("User directory returned no user list.");
             arr.forEach(n -> out.add(map(n)));
-            return out;
-        } catch (Exception e) {
-            throw new DirectoryException("User directory returned invalid JSON.");
+            String next =
+                    root.hasNonNull("nextPageToken") ? root.get("nextPageToken").asText() : "";
+            if (!next.isEmpty() && !tokens.add(next))
+                throw new DirectoryException("User directory repeated a page token.");
+            url =
+                    next.isEmpty()
+                            ? null
+                            : first + "&pageToken=" + URLEncoder.encode(next, StandardCharsets.UTF_8);
         }
+        return out;
     }
 }

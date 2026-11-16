@@ -1,0 +1,11 @@
+target/
+*.log
+.env
+.env.*
+*.local
+*.pem
+*.p12
+*.key
+serviceAccount*.json
+*-service-account.json
+firebase-adminsdk-*.json
